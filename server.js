@@ -149,18 +149,6 @@ const isHtmlRoute = (pathname) => !path.extname(pathname);
 await loadLocalEnv();
 
 const handleChat = createChatHandler(process.env);
-const vite = isDev
-  ? await (async () => {
-      const { createServer: createViteServer } = await import("vite");
-
-      return createViteServer({
-        server: {
-          middlewareMode: true,
-        },
-        appType: "spa",
-      });
-    })()
-  : null;
 
 const server = createServer(async (req, res) => {
   const pathname = new URL(req.url || "/", "http://localhost").pathname;
@@ -169,25 +157,8 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (isDev && vite) {
-    try {
-      if (req.method !== "GET" && req.method !== "HEAD") {
-        sendText(res, 405, "Method not allowed.");
-        return;
-      }
-
-      await runMiddleware(vite.middlewares, req, res);
-      if (!res.writableEnded) {
-        if (isHtmlRoute(pathname)) {
-          await serveDevIndex(vite, req, res, pathname);
-        } else {
-          sendText(res, 404, "Not found.");
-        }
-      }
-    } catch (error) {
-      vite.ssrFixStacktrace(error);
-      sendText(res, 500, error.message || "Could not serve the development app.");
-    }
+  if (isDev) {
+    sendText(res, 404, "Use Vite dev server for the frontend. This server only provides /api in dev.");
     return;
   }
 
@@ -215,7 +186,7 @@ const server = createServer(async (req, res) => {
   }
 });
 
-const port = Number.parseInt(process.env.PORT || (isDev ? "5173" : "4173"), 10);
+const port = Number.parseInt(process.env.PORT || "4173", 10);
 
 server.listen(port, () => {
   console.log(

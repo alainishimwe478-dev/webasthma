@@ -1,23 +1,29 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { users, healthLogs, riskHistory } from "../utils/mockData";
+import { getUsers, healthLogs, riskHistory } from "../utils/mockData";
 import { motion } from "framer-motion";
 import {
   FaUserMd,
-  FaHeartbeat,
-  FaChartLine,
-  FaBell,
-  FaPhone,
+  FaTimes,
 } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import AdminShell from "../components/Layout/AdminShell";
+import { useNotification } from "../context/NotificationContext";
+import toast from "react-hot-toast";
 
 const MyPatients = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const [alertTarget, setAlertTarget] = useState(null);
+  const [alertMessage, setAlertMessage] = useState("");
+  const { sendNotificationToUser } = useNotification();
 
-  const doctorPatients = users.filter(
-    (u) => u.role === "patient" && u.assignedDoctorId === user?.id,
+  const doctorPatients = useMemo(
+    () =>
+      getUsers().filter(
+        (account) => account.role === "patient" && account.assignedDoctorId === user?.id,
+      ),
+    [user?.id],
   );
   const filteredPatients = doctorPatients.filter(
     (p) =>
@@ -36,6 +42,38 @@ const MyPatients = () => {
       default:
         return "bg-slate-500";
     }
+  };
+
+  const openAlertModal = (patient) => {
+    setAlertTarget(patient);
+    setAlertMessage(
+      `Doctor ${user?.name || ""}: Please review your symptoms today and keep your inhaler nearby.`,
+    );
+  };
+
+  const closeAlertModal = () => {
+    setAlertTarget(null);
+    setAlertMessage("");
+  };
+
+  const handleSendAlert = () => {
+    if (!alertTarget || !alertMessage.trim()) {
+      toast.error("Please enter an alert message.");
+      return;
+    }
+
+    sendNotificationToUser(
+      alertTarget,
+      alertMessage.trim(),
+      "warning",
+      "high",
+      {
+        senderRole: "doctor",
+        senderName: user?.name || "Doctor",
+      },
+    );
+    toast.success(`Alert sent to ${alertTarget.name}.`);
+    closeAlertModal();
   };
 
   return (
@@ -146,7 +184,10 @@ const MyPatients = () => {
                       {recentRisk?.risk || "low"}
                     </span>
                   </div>
-                  <button className="0r63dozq w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-xl">
+                  <button
+                    onClick={() => openAlertModal(patient)}
+                    className="0r63dozq w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-xl"
+                  >
                     Send Alert
                   </button>
                 </div>
@@ -172,6 +213,59 @@ const MyPatients = () => {
         )}
         </div>
       </div>
+
+      {alertTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-2xl rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Send Alert to {alertTarget.name}</h2>
+                <p className="text-sm text-slate-500">
+                  This alert will appear in the patient notification feed.
+                </p>
+              </div>
+              <button
+                onClick={closeAlertModal}
+                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close alert modal"
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                Patient: <span className="font-semibold text-slate-900">{alertTarget.name}</span>
+                {" · "}
+                District: <span className="font-semibold text-slate-900">{alertTarget.district}</span>
+              </div>
+
+              <textarea
+                value={alertMessage}
+                onChange={(event) => setAlertMessage(event.target.value)}
+                rows={6}
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+                placeholder="Type the alert message for the patient..."
+              />
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={closeAlertModal}
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendAlert}
+                  className="rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white transition hover:bg-emerald-700"
+                >
+                  Send Alert
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminShell>
   );
 };

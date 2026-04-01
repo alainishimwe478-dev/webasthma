@@ -1,7 +1,9 @@
 ﻿﻿// Updated Asthma Shield Mock Data - Full Spec Compliance
 
+const USERS_STORAGE_KEY = 'asthma_managed_users';
+
 // Mock users with triggerProfile, medicationRegimen (spec-compliant)
-export let users = [
+const defaultUsers = [
   {
     id: 1,
     name: 'Dr. Alice Umuhoza',
@@ -72,6 +74,69 @@ export let users = [
     assignedDoctorId: 1
   },
 ];
+
+const cloneUsers = (value) => JSON.parse(JSON.stringify(value));
+
+const readStoredUsers = () => {
+  if (typeof window === 'undefined') {
+    return cloneUsers(defaultUsers);
+  }
+
+  const storedUsers = window.localStorage.getItem(USERS_STORAGE_KEY);
+  if (!storedUsers) {
+    return cloneUsers(defaultUsers);
+  }
+
+  try {
+    const parsedUsers = JSON.parse(storedUsers);
+    return Array.isArray(parsedUsers) && parsedUsers.length
+      ? parsedUsers
+      : cloneUsers(defaultUsers);
+  } catch {
+    return cloneUsers(defaultUsers);
+  }
+};
+
+const persistUsers = () => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+  window.dispatchEvent(new CustomEvent('managed-users-updated'));
+};
+
+export let users = readStoredUsers();
+
+export const getUsers = () => users;
+
+export const addManagedUser = (userData) => {
+  const newUser = {
+    id: Date.now(),
+    ...userData,
+  };
+
+  users = [...users, newUser];
+  persistUsers();
+  return newUser;
+};
+
+export const updateManagedUser = (userId, updates) => {
+  let updatedUser = null;
+
+  users = users.map((user) => {
+    if (user.id !== userId) return user;
+    updatedUser = { ...user, ...updates };
+    return updatedUser;
+  });
+
+  persistUsers();
+  return updatedUser;
+};
+
+export const deleteManagedUser = (userId) => {
+  const removedUser = users.find((user) => user.id === userId) || null;
+  users = users.filter((user) => user.id !== userId);
+  persistUsers();
+  return removedUser;
+};
 
 export const districtRisk = {
   Kigali: { level: 'high', score: 8 },
@@ -268,4 +333,3 @@ export const markNotificationRead = (id) => {
   if (notification) notification.read = true;
   dispatchNotificationUpdate();
 };
-

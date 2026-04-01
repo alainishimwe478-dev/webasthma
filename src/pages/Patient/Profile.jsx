@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   FaUser, 
@@ -25,21 +25,29 @@ import {
   FaUserMd,
   FaShieldAlt,
   FaSmog,
-  FaTint
+  FaTint,
+  FaCamera,
+  FaTrash
 } from 'react-icons/fa';
 import Navbar from '../../components/Layout/Navbar';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
+import UserAvatar from '../../components/UserAvatar';
+
+const MAX_AVATAR_SIZE = 1024 * 1024;
 
 const Profile = () => {
+  const { user, updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
+  const fileInputRef = useRef(null);
   
   const [profileData, setProfileData] = useState({
-    name: 'John Doe',
-    email: 'john.doe@example.com',
+    name: user?.name || 'John Doe',
+    email: user?.email || 'john.doe@example.com',
     phone: '+250 788 123 456',
     dateOfBirth: '1990-05-15',
-    address: 'Kigali, Rwanda',
+    address: user?.district ? `${user.district}, Rwanda` : 'Kigali, Rwanda',
     emergencyContact: '+250 788 789 012',
     emergencyName: 'Jane Doe',
     bloodType: 'O+',
@@ -94,6 +102,25 @@ const Profile = () => {
     }
   ];
 
+  useEffect(() => {
+    setProfileData((currentProfile) => ({
+      ...currentProfile,
+      name: user?.name || currentProfile.name,
+      email: user?.email || currentProfile.email,
+      address: user?.district ? `${user.district}, Rwanda` : currentProfile.address,
+      phone: user?.phone || currentProfile.phone,
+      dateOfBirth: user?.dateOfBirth || currentProfile.dateOfBirth,
+      emergencyContact: user?.emergencyContact || currentProfile.emergencyContact,
+      emergencyName: user?.emergencyName || currentProfile.emergencyName,
+      bloodType: user?.bloodType || currentProfile.bloodType,
+    }));
+  }, [user]);
+
+  const memberId = useMemo(
+    () => `AS-${String(user?.id || 0).padStart(4, '0')}`,
+    [user],
+  );
+
   const handleProfileChange = (field, value) => {
     setProfileData({ ...profileData, [field]: value });
   };
@@ -107,8 +134,47 @@ const Profile = () => {
   };
 
   const handleSave = () => {
+    updateUser({
+      name: profileData.name,
+      email: profileData.email,
+      phone: profileData.phone,
+      dateOfBirth: profileData.dateOfBirth,
+      address: profileData.address,
+      emergencyContact: profileData.emergencyContact,
+      emergencyName: profileData.emergencyName,
+      bloodType: profileData.bloodType,
+    });
     setIsEditing(false);
     toast.success('Profile updated successfully!');
+  };
+
+  const handleAvatarChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.');
+      return;
+    }
+
+    if (file.size > MAX_AVATAR_SIZE) {
+      toast.error('Profile image must be smaller than 1 MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return;
+      updateUser({ avatar: reader.result });
+      toast.success('Profile image updated.');
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  };
+
+  const handleRemoveAvatar = () => {
+    updateUser({ avatar: '' });
+    toast.success('Profile image removed.');
   };
 
   const tabs = [
@@ -138,12 +204,34 @@ const Profile = () => {
             >
               <div className="0jy2ro6s flex flex-col md:flex-row items-center md:items-start justify-between">
                 <div className="0f0tq2x6 flex items-center space-x-6 mb-4 md:mb-0">
-                  <div className="0cn22a2f w-24 h-24 bg-white rounded-full flex items-center justify-center">
-                    <FaUser className="0ft522qv text-5xl text-blue-600" />
+                  <div className="relative">
+                    <UserAvatar
+                      user={user}
+                      sizeClassName="w-24 h-24"
+                      textClassName="text-3xl"
+                      iconClassName="text-5xl"
+                      className="bg-white ring-4 ring-white/30"
+                    />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-white shadow-lg transition hover:bg-slate-800"
+                      aria-label="Upload profile image"
+                    >
+                      <FaCamera />
+                    </button>
                   </div>
                   <div>
                     <h2 className="05sni883 text-2xl font-bold">{profileData.name}</h2>
-                    <p className="0o03gjgn text-blue-100">Patient ID: AS-{Math.floor(Math.random() * 10000)}</p>
+                    <p className="0o03gjgn text-blue-100">
+                      {user?.role === 'doctor' ? 'Doctor ID' : user?.role === 'admin' ? 'Admin ID' : 'Patient ID'}: {memberId}
+                    </p>
                     <div className="0w82ua3e flex items-center space-x-4 mt-2">
                       <span className="0jo20qgd flex items-center space-x-1">
                         <FaCheckCircle className="0d3b3g07 text-green-300" />
@@ -153,6 +241,23 @@ const Profile = () => {
                         <FaChartLine className="09x5ko5i text-blue-300" />
                         <span className="03pcn53i text-sm">Risk Level: Low</span>
                       </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="rounded-lg bg-white/15 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/25"
+                      >
+                        Change Image
+                      </button>
+                      {user?.avatar && (
+                        <button
+                          onClick={handleRemoveAvatar}
+                          className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/20"
+                        >
+                          <FaTrash />
+                          Remove
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

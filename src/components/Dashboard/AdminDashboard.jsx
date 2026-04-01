@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   FaUsers,
@@ -15,24 +15,31 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
-import { notifications, users } from '../../utils/mockData';
+import { getUsers, notifications } from '../../utils/mockData';
 
 const AdminDashboard = () => {
   const { logout } = useAuth();
   const [isLogsOpen, setIsLogsOpen] = useState(false);
+  const [managedUsers, setManagedUsers] = useState(() => getUsers());
+
+  useEffect(() => {
+    const syncUsers = () => setManagedUsers(getUsers());
+    window.addEventListener('managed-users-updated', syncUsers);
+    return () => window.removeEventListener('managed-users-updated', syncUsers);
+  }, []);
 
   const stats = [
-    { label: 'Total Users', value: String(users.length), change: '+12%', icon: FaUsers, color: 'blue' },
+    { label: 'Total Users', value: String(managedUsers.length), change: '+12%', icon: FaUsers, color: 'blue' },
     {
       label: 'Active Patients',
-      value: String(users.filter((user) => user.role === 'patient').length),
+      value: String(managedUsers.filter((user) => user.role === 'patient').length),
       change: '+8%',
       icon: FaUsers,
       color: 'green',
     },
     {
       label: 'Active Doctors',
-      value: String(users.filter((user) => user.role === 'doctor').length),
+      value: String(managedUsers.filter((user) => user.role === 'doctor').length),
       change: '+5%',
       icon: FaUsers,
       color: 'purple',
@@ -57,7 +64,7 @@ const AdminDashboard = () => {
   const notificationLogs = useMemo(
     () =>
       notifications.map((notification) => {
-        const owner = users.find((user) => user.id === notification.userId);
+        const owner = managedUsers.find((user) => user.id === notification.userId);
 
         return {
           ...notification,
@@ -65,7 +72,7 @@ const AdminDashboard = () => {
           ownerEmail: owner?.email || 'No email',
         };
       }),
-    [],
+    [managedUsers],
   );
 
   const exportCsv = () => {

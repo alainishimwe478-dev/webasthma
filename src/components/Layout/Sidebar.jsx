@@ -14,6 +14,7 @@ import {
   FaSignOutAlt,
 } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
+import UserAvatar from "../UserAvatar";
 
 const Sidebar = () => {
   const { user, logout } = useAuth();
@@ -42,6 +43,7 @@ const Sidebar = () => {
     { to: "/environment", icon: FaCloudSun, label: "Sensor Network" },
     { to: "/content", icon: FaFileAlt, label: "Content Management" },
     { to: "/system-analytics", icon: FaChartLine, label: "System Analytics" },
+    { to: "/patient/profile", icon: FaUserMd, label: "Profile" },
     { to: "/settings", icon: FaCog, label: "Settings" },
   ];
 
@@ -62,6 +64,18 @@ const Sidebar = () => {
           <span className="0mpxze09 font-bold text-xl text-gray-800">
             Asthma<span className="0zbkdpis text-blue-600">Shield</span>
           </span>
+        </div>
+        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
+          <UserAvatar
+            user={user}
+            sizeClassName="w-12 h-12"
+            textClassName="text-lg"
+            iconClassName="text-3xl"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-900">{user?.name || "User"}</p>
+            <p className="text-xs capitalize text-slate-500">{user?.role || "member"}</p>
+          </div>
         </div>
       </div>
 
@@ -87,7 +101,7 @@ const Sidebar = () => {
       <div className="03l3yaof p-4 border-t">
         <button
           onClick={handleLogout}
-          className="0tz13yje flex items-center space-x- Ascendancy py-3 rounded-lg w-full text-gray-600 hover:bg-red-50 hover:text-red-600 transition"
+          className="0tz13yje flex items-center space-x-3 py-3 rounded-lg w-full text-gray-600 hover:bg-red-50 hover:text-red-600 transition"
         >
           <FaSignOutAlt className="0q3dz2tv text-lg" />
           <span>Logout</span>

@@ -26,6 +26,23 @@ const readStoredNotifications = (storageKey) => {
   }
 };
 
+const dedupeAndLimitNotifications = (notifications, incomingNotification) => {
+  const recent24h = notifications.filter(
+    (notification) =>
+      new Date() - new Date(notification.timestamp || notification.createdAt) <
+      24 * 60 * 60 * 1000,
+  );
+  const duplicate = recent24h.some(
+    (notification) => notification.message === incomingNotification.message,
+  );
+
+  if (duplicate) {
+    return notifications;
+  }
+
+  return [incomingNotification, ...notifications].slice(0, 10);
+};
+
 const getDefaultNotificationsForUser = (user) => {
   if (!user) return [];
 
@@ -81,17 +98,11 @@ const notificationReducer = (state, action) => {
       newNotifications = action.payload;
       break;
     case "ADD":
-      // Dedupe: prevent identical message within 24h
-      const recent24h = state.notifications.filter(
-        (n) => new Date() - new Date(n.timestamp) < 24 * 60 * 60 * 1000,
+      newNotifications = dedupeAndLimitNotifications(
+        state.notifications,
+        action.payload,
       );
-      const duplicate = recent24h.some(
-        (n) => n.message === action.payload.message,
-      );
-      if (duplicate) return state;
-
-      // Limit to latest 10
-      newNotifications = [action.payload, ...state.notifications].slice(0, 10);
+      if (newNotifications === state.notifications) return state;
 
       // Sync to mockData for compatibility
       mockAddNotification(
@@ -234,6 +245,58 @@ export const NotificationProvider = ({ children, dashboardData = {} }) => {
     });
   };
 
+  const sendNotificationToUser = (
+    targetUser,
+    message,
+    type = "warning",
+    priority = "high",
+    metadata = {},
+  ) => {
+    if (!targetUser?.email) {
+      throw new Error("A target user with an email is required.");
+    }
+
+    const notification = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      message,
+      type,
+      priority,
+      timestamp: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      read: false,
+      userId: targetUser.id,
+      ...metadata,
+    };
+
+    const targetStorageKey = getNotificationStorageKey(targetUser);
+    const existingNotifications = readStoredNotifications(targetStorageKey);
+    const seededNotifications =
+      existingNotifications.length > 0
+        ? existingNotifications
+        : getDefaultNotificationsForUser(targetUser);
+    const nextNotifications = dedupeAndLimitNotifications(
+      seededNotifications,
+      notification,
+    );
+
+    try {
+      localStorage.setItem(targetStorageKey, JSON.stringify(nextNotifications));
+    } catch (error) {
+      console.warn("Failed to persist target notification:", error);
+    }
+
+    mockAddNotification(targetUser.id, message, type);
+
+    if (
+      user?.email &&
+      user.email.toLowerCase() === String(targetUser.email).toLowerCase()
+    ) {
+      dispatch({ type: "LOAD", payload: nextNotifications });
+    }
+
+    return notification;
+  };
+
   const markRead = (id) => dispatch({ type: "MARK_READ", id });
   const markAllRead = () => dispatch({ type: "MARK_ALL_READ" });
   const clearAll = () => dispatch({ type: "CLEAR_ALL" });
@@ -248,6 +311,7 @@ export const NotificationProvider = ({ children, dashboardData = {} }) => {
       value={{
         notifications: state.notifications,
         addNotification,
+        sendNotificationToUser,
         markRead,
         markAllRead,
         clearAll,

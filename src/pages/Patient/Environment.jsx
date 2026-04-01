@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { fetchLiveEnvData } from "@/utils/environmentAPI.js";
 import {
-  RWANDA_DEFAULT_LOCATION,
-  getHumidityStandard,
-  getTemperatureStandard,
-} from "@/utils/rwandaEnvironment.js";
+  fetchLiveEnvData,
+  getRwandaFallback,
+  normalizeEnvironmentData,
+} from "@/utils/environmentAPI.js";
+import { getHumidityStandard, getTemperatureStandard } from "@/utils/rwandaEnvironment.js";
+
+const KIGALI_LOCATION = {
+  lat: -1.9441,
+  lon: 30.0619,
+  label: "Kigali",
+};
 
 const Environment = () => {
-  const [envData, setEnvData] = useState({
-    temperature: 25,
-    humidity: 60,
-    aqi: 85,
-    pollen: 50,
-  });
+  const [envData, setEnvData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -20,15 +21,15 @@ const Environment = () => {
     const fetchData = async () => {
       try {
         const data = await fetchLiveEnvData(
-          RWANDA_DEFAULT_LOCATION.lat,
-          RWANDA_DEFAULT_LOCATION.lon,
-          RWANDA_DEFAULT_LOCATION.label,
+          KIGALI_LOCATION.lat,
+          KIGALI_LOCATION.lon,
+          KIGALI_LOCATION.label,
         );
-        setEnvData(data);
+        setEnvData(normalizeEnvironmentData(data));
       } catch (err) {
-        setError("Failed to fetch Rwanda environment data. Showing fallback data.");
+        setError("Failed to fetch Kigali environment data. Showing fallback data.");
         console.error("Environment fetch error:", err);
-        setEnvData({ temperature: 25, humidity: 60, aqi: 85, pollen: 50 });
+        setEnvData(normalizeEnvironmentData(getRwandaFallback()));
       } finally {
         setLoading(false);
       }
@@ -50,7 +51,7 @@ const Environment = () => {
   if (loading) {
     return (
       <div className="0mivm2ej p-8 flex justify-center items-center">
-        <div className="04v5enfn text-lg">Loading environment data...</div>
+        <div className="04v5enfn text-lg">Loading live Kigali weather...</div>
       </div>
     );
   }

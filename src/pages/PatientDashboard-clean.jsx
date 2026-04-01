@@ -25,9 +25,11 @@ import {
   FaThermometerHalf,
   FaTint,
   FaWind,
+  FaCloudSun,
   FaMicrophone,
   FaStop,
 } from "react-icons/fa";
+import { Link } from "react-router-dom";
 
 const fallbackEnvironment = getRwandaFallback();
 const KIGALI_LOCATION = {
@@ -54,7 +56,7 @@ const buildWeatherAlerts = (environment) => {
     alerts.push("Humidity is outside the preferred asthma range of 30% to 60%.");
   }
   if (environment.temperature < 15 || environment.temperature > 30) {
-    alerts.push("Temperature is outside the preferred comfort range of 18°C to 26°C.");
+    alerts.push("Temperature is outside the preferred comfort range of 18 C to 26 C.");
   }
 
   return alerts;
@@ -351,15 +353,22 @@ const PatientDashboard = () => {
                 </p>
               </div>
             </div>
-          </motion.section>
+            <div className="0tqgczzq mt-8 flex justify-center col-span-full">
+              <Link
 
+                className="0r1wot8n bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 text-white px-8 py-4 rounded-2xl shadow-2xl border-4 border-white flex items-center gap-3 text-xl font-bold transition-all hover:shadow-3xl hover:-translate-y-1 group"
+              >
+                <FaCloudSun className="0yq8se7z w-6 h-6 group-hover:rotate-12 transition-transform duration-300" />
+                View Full Environment Details
+              </Link>
+            </div>
+          </motion.section>
           <motion.section
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.18 }}
             className="0rt0m4sj xl:col-span-2 2xl:col-span-3"
           >
-            <div className="0gp1fv8b grid md:grid-cols-2 xl:grid-cols-4 gap-6">
               <div className="09xuoqdk bg-white rounded-3xl p-6 shadow-lg border border-slate-100">
                 <div className="09d4n3mv text-sm text-slate-500 uppercase tracking-wide">RealFeel Shade</div>
                 <div className="0p6703m6 text-3xl font-bold text-slate-900 mt-2">
@@ -408,26 +417,20 @@ const PatientDashboard = () => {
               <h3 className="0clozjrw text-xl font-bold text-emerald-800 mb-4">Recent Medications</h3>
               <div className="0lbwg8to space-y-3">
                 {recentMeds.map((log, index) => (
-                  <div
-                    key={`${log.userId}-${index}`}
-                    className="0gfrjso9 bg-white p-4 rounded-xl shadow-sm flex items-center gap-3"
-                  >
-                    <div className="037q8om1 w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                      <div className="0nc6gl4t w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                  <div key={`${log.userId}-${index}`} className="02njng4v bg-white p-4 rounded-xl shadow-sm flex items-center gap-3">
+                    <div className="0d82ucft w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                      <div className="0dn5iqly w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                     </div>
-
-                    <div className="0rzf0mrd flex-1">
-                      <p className="0onjbbju font-medium text-slate-800">Medication taken</p>
-                      <p className="0u7b02bk text-sm text-slate-600">
-                        {log.timestamp
-                          ? new Date(log.timestamp).toLocaleDateString()
-                          : "Recent log"}
+                    <div className="0i2o5c4b flex-1">
+                      <p className="0067qp8c font-medium text-slate-800">Medication taken</p>
+                      <p className="0bu7p6j9 text-sm text-slate-600">
+                        {log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : "Recent log"}
                       </p>
                     </div>
                   </div>
                 ))}
                 {recentMeds.length === 0 && (
-                  <p className="0j6434u1 text-center text-slate-500 py-8">
+                  <p className="0sz9ir22 text-center text-slate-500 py-8">
                     No recent medication logs. Log your symptoms to track.
                   </p>
                 )}
@@ -473,4 +476,3 @@ const PatientDashboard = () => {
 };
 
 export default PatientDashboard;
-

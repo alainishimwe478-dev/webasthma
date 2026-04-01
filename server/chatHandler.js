@@ -1,6 +1,7 @@
 import { ASTHMA_CHAT_REFERENCE } from "../src/utils/asthmaKnowledgeBase.js";
 
 const CHAT_ROUTE = "/api/chat";
+const TTS_ROUTE = "/api/tts";
 
 const sendJson = (res, statusCode, payload) => {
   res.statusCode = statusCode;
@@ -62,58 +63,129 @@ const buildOpenAIInput = (messages, userName) => {
 };
 
 export const createChatHandler = (env = process.env) => async (req, res) => {
-  if (getPathname(req) !== CHAT_ROUTE || req.method !== "POST") {
-    return false;
-  }
+  const pathname = getPathname(req);
 
-  const apiKey = env.OPENAI_API_KEY;
-  const model = env.OPENAI_MODEL || "gpt-5.2";
+  if (pathname === CHAT_ROUTE && req.method === "POST") {
+    const apiKey = env.OPENAI_API_KEY;
+    const model = env.OPENAI_MODEL || "gpt-5.2";
 
-  if (!apiKey) {
-    sendJson(res, 500, {
-      error: "OPENAI_API_KEY is not configured on the server.",
-    });
-    return true;
-  }
-
-  try {
-    const parsed = await readJsonBody(req);
-    const messages = Array.isArray(parsed.messages)
-      ? parsed.messages.slice(-12)
-      : [];
-    const userName = parsed.userName || "Patient";
-
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        input: buildOpenAIInput(messages, userName),
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      sendJson(res, response.status, {
-        error: data?.error?.message || "OpenAI request failed.",
+    if (!apiKey) {
+      sendJson(res, 500, {
+        error: "OPENAI_API_KEY is not configured on the server.",
       });
       return true;
     }
 
-    sendJson(res, 200, {
-      reply: data.output_text || "I could not generate a response right now.",
-    });
-  } catch (error) {
-    sendJson(res, 500, {
-      error: error.message || "Chat request failed.",
-    });
+    try {
+      const parsed = await readJsonBody(req);
+      const messages = Array.isArray(parsed.messages)
+        ? parsed.messages.slice(-12)
+        : [];
+      const userName = parsed.userName || "Patient";
+
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          input: buildOpenAIInput(messages, userName),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        sendJson(res, response.status, {
+          error: data?.error?.message || "OpenAI request failed.",
+        });
+        return true;
+      }
+
+      sendJson(res, 200, {
+        reply: data.output_text || "I could not generate a response right now.",
+      });
+    } catch (error) {
+      sendJson(res, 500, {
+        error: error.message || "Chat request failed.",
+      });
+    }
+
+    return true;
   }
 
-  return true;
+  if (pathname === TTS_ROUTE && req.method === "POST") {
+    const apiKey = env.OPENAI_API_KEY;
+    const ttsModel = env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
+    const ttsVoice = env.OPENAI_TTS_VOICE || "alloy";
+
+    if (!apiKey) {
+      sendJson(res, 500, {
+        error: "OPENAI_API_KEY is not configured on the server.",
+      });
+      return true;
+    }
+
+    try {
+      const parsed = await readJsonBody(req);
+      const text = String(parsed.text || "").trim();
+
+      if (!text) {
+        sendJson(res, 400, {
+          error: "Text is required for speech generation.",
+        });
+        return true;
+      }
+
+      const response = await fetch("https://api.openai.com/v1/audio/speech", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: ttsModel,
+          voice: ttsVoice,
+          input: text.slice(0, 2000),
+          instructions:
+            "Speak clearly and warmly for a patient learning about asthma. This is AI-generated voice audio.",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let parsedError = {};
+
+        try {
+          parsedError = errorText ? JSON.parse(errorText) : {};
+        } catch {
+          parsedError = {};
+        }
+
+        sendJson(res, response.status, {
+          error: parsedError?.error?.message || errorText || "Speech generation failed.",
+        });
+        return true;
+      }
+
+      const audioBuffer = Buffer.from(await response.arrayBuffer());
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.end(audioBuffer);
+    } catch (error) {
+      sendJson(res, 500, {
+        error: error.message || "Speech generation failed.",
+      });
+    }
+
+    return true;
+  }
+
+  {
+    return false;
+  }
 };
 
 export const createViteChatMiddleware = (env) => {

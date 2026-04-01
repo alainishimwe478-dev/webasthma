@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { addManagedUser, getUsers } from '../utils/mockData';
 
 const AuthContext = createContext();
 
@@ -27,53 +28,29 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (email, password) => {
-    // Demo authentication - accept any password for demo
-    const demoUsers = {
-      'patient@asthmashield.com': { 
-        id: 1, 
-        name: 'John Doe', 
-        email: 'patient@asthmashield.com', 
-        role: 'patient', 
-        triggerProfile: ['pollen', 'dust'], 
-        medicationRegimen: [
-          { name: 'Albuterol', dosage: '2 puffs', frequency: 'As needed' },
-          { name: 'Fluticasone', dosage: '1 puff', frequency: 'Twice daily' }
-        ] 
-      },
-      'doctor@asthmashield.com': { 
-        id: 2, 
-        name: 'Dr. Sarah Johnson', 
-        email: 'doctor@asthmashield.com', 
-        role: 'doctor', 
-        specialty: 'Pulmonology' 
-      },
-      'admin@asthmashield.com': { 
-        id: 3, 
-        name: 'Admin User', 
-        email: 'admin@asthmashield.com', 
-        role: 'admin' 
-      }
-    };
+    const normalizedEmail = email.trim().toLowerCase();
+    const matchedUser = getUsers().find(
+      (account) => account.email?.toLowerCase() === normalizedEmail,
+    );
 
-    if (demoUsers[email]) {
-      const userData = demoUsers[email];
+    if (matchedUser && (!matchedUser.password || matchedUser.password === password)) {
+      const userData = matchedUser;
       localStorage.setItem('asthma_user', JSON.stringify(userData));
       setUser(userData);
       setIsAuthenticated(true);
       toast.success('Login successful! Welcome to Asthma Shield.');
       return true;
     } else {
-      toast.error('Invalid email. Use demo accounts shown below.');
+      toast.error('Invalid email or password.');
       return false;
     }
   };
 
   const signup = (userData) => {
-    const newUser = {
-      id: Date.now(),
+    const newUser = addManagedUser({
       ...userData,
       role: userData.role || 'patient'
-    };
+    });
     localStorage.setItem('asthma_user', JSON.stringify(newUser));
     setUser(newUser);
     setIsAuthenticated(true);

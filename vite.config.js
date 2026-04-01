@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+  ],
   optimizeDeps: {
     force: true,
     include: [
@@ -28,6 +30,9 @@ export default defineConfig({
   server: {
     hmr: {
       overlay: false
+    },
+    proxy: {
+      '/api': 'http://localhost:4173'
     }
   }
 })

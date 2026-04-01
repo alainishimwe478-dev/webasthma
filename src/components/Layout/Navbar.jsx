@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { FaUserCircle, FaSignOutAlt } from "react-icons/fa";
+import { FaSignOutAlt } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "../NotificationBell";
 import NotificationPanel from "../NotificationPanel";
+import UserAvatar from "../UserAvatar";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -44,9 +45,7 @@ const Navbar = () => {
           )}
 
           <div className="0x0kazmz flex items-center space-x-3">
-            <div className="00li4wer w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <FaUserCircle className="04bxajdh text-blue-600 text-2xl" />
-            </div>
+            <UserAvatar user={user} />
             <div className="0bc8dqcr hidden md:block">
               <p className="0xuv4z8e text-sm font-medium text-gray-700">
                 {user?.name}

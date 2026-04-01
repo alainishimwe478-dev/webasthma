@@ -1,19 +1,47 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { FaUsers, FaChartLine, FaUserMd, FaCalendarAlt, FaHeartbeat, FaPrescriptionBottle, FaEnvelope } from 'react-icons/fa';
+import { getUsers } from '../../utils/mockData';
 
 const DoctorDashboard = () => {
-  const patients = [
-    { id: 1, name: 'John Doe', age: 34, lastVisit: '2024-01-15', riskLevel: 'low', adherence: 92, lastPeakFlow: 385 },
-    { id: 2, name: 'Jane Smith', age: 28, lastVisit: '2024-01-10', riskLevel: 'medium', adherence: 78, lastPeakFlow: 340 },
-    { id: 3, name: 'Robert Johnson', age: 45, lastVisit: '2024-01-12', riskLevel: 'low', adherence: 95, lastPeakFlow: 420 },
-    { id: 4, name: 'Maria Garcia', age: 52, lastVisit: '2024-01-14', riskLevel: 'high', adherence: 65, lastPeakFlow: 310 }
-  ];
+  const patients = useMemo(() => {
+    const allUsers = getUsers();
+    const managedPatients = allUsers.filter((account) => account.role === 'patient');
+
+    if (managedPatients.length) {
+      return managedPatients.map((patient, index) => ({
+        id: patient.id,
+        name: patient.name,
+        age: patient.age || 0,
+        lastVisit: ['2024-01-15', '2024-01-10', '2024-01-12', '2024-01-14'][index % 4],
+        riskLevel: ['low', 'medium', 'low', 'high'][index % 4],
+        adherence: [92, 78, 95, 65][index % 4],
+        lastPeakFlow: [385, 340, 420, 310][index % 4],
+      }));
+    }
+
+    return [
+      { id: 1, name: 'John Doe', age: 34, lastVisit: '2024-01-15', riskLevel: 'low', adherence: 92, lastPeakFlow: 385 },
+      { id: 2, name: 'Jane Smith', age: 28, lastVisit: '2024-01-10', riskLevel: 'medium', adherence: 78, lastPeakFlow: 340 },
+    ];
+  }, []);
 
   const stats = [
-    { label: 'Total Patients', value: '124', icon: FaUsers, color: 'blue' },
-    { label: 'High Risk Patients', value: '8', icon: FaHeartbeat, color: 'red' },
-    { label: 'Avg. Adherence', value: '86%', icon: FaPrescriptionBottle, color: 'green' },
+    { label: 'Total Patients', value: String(patients.length), icon: FaUsers, color: 'blue' },
+    {
+      label: 'High Risk Patients',
+      value: String(patients.filter((patient) => patient.riskLevel === 'high').length),
+      icon: FaHeartbeat,
+      color: 'red',
+    },
+    {
+      label: 'Avg. Adherence',
+      value: `${Math.round(
+        patients.reduce((total, patient) => total + patient.adherence, 0) / (patients.length || 1),
+      )}%`,
+      icon: FaPrescriptionBottle,
+      color: 'green',
+    },
     { label: 'Appointments', value: '12', icon: FaCalendarAlt, color: 'purple' }
   ];
 
@@ -85,7 +113,7 @@ const DoctorDashboard = () => {
               {patients.map((patient, index) => (
                 <tr key={patient.id} className="01aket9y hover:bg-gray-50">
                   <td className="0onycl3b px-4 py-3">
-                    <div className="0o3iko8f flex items-center space-x- Ascendancy">
+                    <div className="0o3iko8f flex items-center space-x-3">
                       <div className="0fwtkuqg w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                         <FaUserMd className="055opfji text-blue-600 text-sm" />
                       </div>
