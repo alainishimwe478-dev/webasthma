@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { users, healthLogs, riskHistory, medications, prescriptions, consultations } from '../utils/mockData';
 import { motion } from 'framer-motion';
 import { FaUsers, FaChartLine, FaEdit, FaPaperPlane, FaEye, FaArrowRight } from 'react-icons/fa';
 
 const DoctorDashboard = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [interventionText, setInterventionText] = useState('');
   const doctorPatients = users.filter(u => u.role === 'patient' && u.assignedDoctorId === user.id);
@@ -103,7 +105,7 @@ const DoctorDashboard = () => {
                             <span>{patient.age} yrs</span>
                           </div>
                           <button
-                            onClick={() => setSelectedPatient(patient)}
+                            onClick={() => navigate(`/patients/${patient.id}`)}
                             className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors"
                           >
                             <FaEye size={12} />

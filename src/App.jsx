@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import EducationalHub from "./pages/EducationalHub";
 import PatientLayout from "@/layouts/PatientLayout";
 import PatientDashboard from "./pages/PatientDashboard";
+import PatientDetails from "./pages/PatientDetails";
 import Alerts from "./pages/Patient/Alerts";
 import Environment from "./pages/Patient/Environment";
 import Profile from "./pages/Patient/Profile";
@@ -67,6 +68,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <MyPatients />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/patients/:id"
+        element={
+          <ProtectedRoute>
+            <PatientDetails />
           </ProtectedRoute>
         }
       />
