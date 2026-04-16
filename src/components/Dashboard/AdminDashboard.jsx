@@ -1,400 +1,311 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import {
-  FaUsers,
-  FaChartLine,
-  FaShieldAlt,
-  FaServer,
-  FaExclamationTriangle,
-  FaFileCsv,
-  FaFilePdf,
-  FaBell,
-  FaTimes,
-} from 'react-icons/fa';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getUsers, notifications } from '../../utils/mockData';
+import { motion } from 'framer-motion';
+import { FaUsers, FaSlidersH, FaPlus, FaChartBar, FaVideo } from 'react-icons/fa';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 
 const AdminDashboard = () => {
-  const { logout } = useAuth();
-  const [isLogsOpen, setIsLogsOpen] = useState(false);
-  const [managedUsers, setManagedUsers] = useState(() => getUsers());
+  const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState('users');
+  const [envSliders, setEnvSliders] = useState({ pm25: 45, pollenLevel: 75, temperature: 22, humidity: 65 });
+  const [analyticsData, setAnalyticsData] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [newContent, setNewContent] = useState({ title: '', category: 'Triggers', content: '', videoUrl: '' });
+  const [citiesData, setCitiesData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  const API_BASE = 'http://192.168.1.5:8000';
+
+  const tabs = [
+    { id: 'users', icon: FaUsers, label: 'User Management' },
+    { id: 'analytics', icon: FaChartBar, label: 'System Analytics' },
+    { id: 'env-simulator', icon: FaSlidersH, label: 'Env Simulator' },
+    { id: 'cms', icon: FaVideo, label: 'Content Management' }
+  ];
+
+  // Fetch data
   useEffect(() => {
-    const syncUsers = () => setManagedUsers(getUsers());
-    window.addEventListener('managed-users-updated', syncUsers);
-    return () => window.removeEventListener('managed-users-updated', syncUsers);
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [usersRes, citiesRes, analyticsRes] = await Promise.all([
+          fetch(`${API_BASE}/registered_users`).then(r => r.json()).catch(() => []),
+          fetch(`${API_BASE}/cities_status`).then(r => r.json()).catch(() => []),
+          fetch(`${API_BASE}/analytics_data`).then(r => r.json()).catch(() => [])
+        ]);
+        setUsers(usersRes);
+        setCitiesData(citiesRes);
+        setAnalyticsData(analyticsRes);
+        if (citiesRes.length > 0) {
+          const kigali = citiesRes.find(c => c.city === 'Kigali');
+          if (kigali) setEnvSliders({
+            pm25: kigali.pm25_recent || 45,
+            pollenLevel: kigali.pollenLevel || 75,
+            temperature: kigali.temperature || 22,
+            humidity: kigali.humidity || 65
+          });
+        }
+      } catch (err) {
+        console.error(err);
+        setError('Backend unavailable. Showing demo data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 60000);
+    return () => clearInterval(interval);
   }, []);
 
-  const stats = [
-    { label: 'Total Users', value: String(managedUsers.length), change: '+12%', icon: FaUsers, color: 'blue' },
-    {
-      label: 'Active Patients',
-      value: String(managedUsers.filter((user) => user.role === 'patient').length),
-      change: '+8%',
-      icon: FaUsers,
-      color: 'green',
-    },
-    {
-      label: 'Active Doctors',
-      value: String(managedUsers.filter((user) => user.role === 'doctor').length),
-      change: '+5%',
-      icon: FaUsers,
-      color: 'purple',
-    },
-    { label: 'System Health', value: '98%', change: '-1%', icon: FaServer, color: 'green' }
-  ];
-
-  const sensors = [
-    { location: 'Kigali', pm25: 45, pollen: 72, status: 'active', lastUpdate: '2 min ago' },
-    { location: 'Musanze', pm25: 38, pollen: 45, status: 'active', lastUpdate: '3 min ago' },
-    { location: 'Rubavu', pm25: 52, pollen: 68, status: 'active', lastUpdate: '1 min ago' },
-    { location: 'Huye', pm25: 41, pollen: 35, status: 'warning', lastUpdate: '5 min ago' }
-  ];
-
-  const recentActivities = [
-    { action: 'New user registered', user: 'john@example.com', time: '5 min ago', type: 'success' },
-    { action: 'Doctor assigned to patient', user: 'dr.smith@example.com', time: '15 min ago', type: 'info' },
-    { action: 'Risk alert triggered', user: 'High pollen in Kigali', time: '25 min ago', type: 'warning' },
-    { action: 'System update completed', user: 'v2.1.0', time: '1 hour ago', type: 'success' }
-  ];
-
-  const notificationLogs = useMemo(
-    () =>
-      notifications.map((notification) => {
-        const owner = managedUsers.find((user) => user.id === notification.userId);
-
-        return {
-          ...notification,
-          ownerName: owner?.name || 'Unknown user',
-          ownerEmail: owner?.email || 'No email',
-        };
-      }),
-    [managedUsers],
-  );
-
-  const exportCsv = () => {
-    const header = ['Notification ID', 'User', 'Email', 'Type', 'Status', 'Created At', 'Message'];
-    const rows = notificationLogs.map((log) => [
-      log.id,
-      log.ownerName,
-      log.ownerEmail,
-      log.type,
-      log.read ? 'Read' : 'Unread',
-      log.createdAt,
-      `"${String(log.message).replace(/"/g, '""')}"`,
-    ]);
-
-    const csv = [header.join(','), ...rows.map((row) => row.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `admin-notification-logs-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success('CSV export downloaded.');
+  const updateEnv = (key, value) => {
+    const newEnv = { ...envSliders, [key]: parseInt(value) };
+    setEnvSliders(newEnv);
+    fetch(`${API_BASE}/simulate_alert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ city: 'Kigali', updatedEnv: newEnv })
+    }).catch(console.error);
   };
 
-  const exportPdf = () => {
-    const pdf = new jsPDF();
-    pdf.setFontSize(18);
-    pdf.text('Asthma Shield Admin Report', 14, 18);
-    pdf.setFontSize(11);
-    pdf.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
-
-    autoTable(pdf, {
-      startY: 34,
-      head: [['Metric', 'Value']],
-      body: stats.map((stat) => [stat.label, stat.value]),
-      theme: 'striped',
-    });
-
-    autoTable(pdf, {
-      startY: pdf.lastAutoTable.finalY + 10,
-      head: [['Location', 'PM2.5', 'Pollen', 'Status', 'Last Update']],
-      body: sensors.map((sensor) => [
-        sensor.location,
-        `${sensor.pm25} ug/m3`,
-        sensor.pollen,
-        sensor.status,
-        sensor.lastUpdate,
-      ]),
-      theme: 'striped',
-    });
-
-    autoTable(pdf, {
-      startY: pdf.lastAutoTable.finalY + 10,
-      head: [['User', 'Type', 'Status', 'Message']],
-      body: notificationLogs.slice(0, 8).map((log) => [
-        log.ownerName,
-        log.type,
-        log.read ? 'Read' : 'Unread',
-        log.message,
-      ]),
-      theme: 'striped',
-    });
-
-    pdf.save(`admin-report-${new Date().toISOString().slice(0, 10)}.pdf`);
-    toast.success('PDF report downloaded.');
+  const addContent = async () => {
+    try {
+      await fetch(`${API_BASE}/add_content`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newContent)
+      });
+      alert('Content added!');
+      setNewContent({ title: '', category: 'Triggers', content: '', videoUrl: '' });
+    } catch (err) {
+      alert('Error adding content');
+    }
   };
 
-  const quickActions = [
-    {
-      label: 'Export CSV',
-      description: 'Download notification logs as CSV.',
-      icon: FaFileCsv,
-      onClick: exportCsv,
-      className: 'bg-emerald-500 hover:bg-emerald-600',
-    },
-    {
-      label: 'PDF Report',
-      description: 'Generate an admin report in PDF.',
-      icon: FaFilePdf,
-      onClick: exportPdf,
-      className: 'bg-rose-500 hover:bg-rose-600',
-    },
-    {
-      label: 'View Notification Logs',
-      description: 'Open recent system notification history.',
-      icon: FaBell,
-      onClick: () => setIsLogsOpen(true),
-      className: 'bg-blue-500 hover:bg-blue-600',
-    },
-  ];
+  const updateUserRole = async (userId, newRole) => {
+    try {
+      await fetch(`${API_BASE}/update_user_role/${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const getCategoryColor = (category) => {
+    switch (category) {
+      case 'Medication': return 'bg-orange-500';
+      case 'Triggers': return 'bg-red-500';
+      case 'Lifestyle': return 'bg-green-500';
+      default: return 'bg-blue-500';
+    }
+  };
+
+  if (loading) return <div className="0yygnhdj p-12 text-center">Loading dashboard...</div>;
+  if (error) return <div className="0cvkanjm p-12 text-center text-red-500">{error}</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-2">Admin Dashboard</h1>
-            <p className="text-blue-100">System overview and management</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {quickActions.map((action) => (
-              <button
-                key={action.label}
-                onClick={action.onClick}
-                className={`${action.className} inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-lg transition`}
-              >
-                <action.icon />
-                {action.label}
-              </button>
-            ))}
-            <button
-              onClick={logout}
-              className="rounded-xl bg-white/15 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/25"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="bg-white rounded-xl shadow-sm p-6"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm">{stat.label}</p>
-                <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
-                <p
-                  className={`text-xs ${
-                    stat.change.includes('+') ? 'text-green-600' : 'text-red-600'
-                  } mt-1`}
-                >
-                  {stat.change} from last month
-                </p>
-              </div>
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                stat.color === 'blue'
-                  ? 'bg-blue-100 text-blue-600'
-                  : stat.color === 'green'
-                    ? 'bg-green-100 text-green-600'
-                    : 'bg-purple-100 text-purple-600'
-              }`}>
-                <stat.icon className="text-xl" />
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
+    <div className="09g73pxl max-w-7xl mx-auto px-6 py-12 space-y-8">
+      {/* Tabs */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="bg-white rounded-xl shadow-sm p-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="01xa20h1 flex flex-wrap gap-2 bg-white/50 backdrop-blur-sm rounded-2xl p-2 shadow-lg border border-white/50"
       >
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-bold text-gray-800">Environmental Sensor Network</h3>
-          <button className="text-blue-600 text-sm hover:underline">Manage Sensors</button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {sensors.map((sensor, index) => (
-            <div key={index} className="border rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-gray-800">{sensor.location}</h4>
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    sensor.status === 'active' ? 'bg-green-500' : 'bg-yellow-500'
-                  }`}
-                ></div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">PM2.5:</span>
-                  <span className="font-medium">{sensor.pm25} ug/m3</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Pollen:</span>
-                  <span className="font-medium">{sensor.pollen}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Last Update:</span>
-                  <span className="text-xs text-gray-400">{sensor.lastUpdate}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        {tabs.map(tab => (
+          <motion.button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`0anx8wf1 flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all group ${
+              activeTab === tab.id
+                ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg'
+                : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+            whileHover={{ scale: 1.05 }}
+          >
+            <tab.icon className={`0sk1jqsc w-5 h-5 ${activeTab === tab.id ? 'text-white' : 'text-slate-500 group-hover:text-slate-700'}`} />
+            {tab.label}
+          </motion.button>
+        ))}
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-white rounded-xl shadow-sm p-6"
-        >
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Recent Activity</h3>
-          <div className="space-y-3">
-            {recentActivities.map((activity, index) => (
-              <div key={index} className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    activity.type === 'success'
-                      ? 'bg-green-100'
-                      : activity.type === 'warning'
-                        ? 'bg-yellow-100'
-                        : 'bg-blue-100'
-                  }`}
-                >
-                  {activity.type === 'warning' ? (
-                    <FaExclamationTriangle className="text-yellow-600 text-sm" />
-                  ) : (
-                    <FaShieldAlt className="text-blue-600 text-sm" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-800">{activity.action}</p>
-                  <p className="text-xs text-gray-500">{activity.user}</p>
-                </div>
-                <p className="text-xs text-gray-400">{activity.time}</p>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="bg-white rounded-xl shadow-sm p-6"
-        >
-          <h3 className="text-lg font-bold text-gray-800 mb-4">System Health</h3>
-          <div className="space-y-4">
-            <HealthBar label="API Response Time" value="124ms" percentage={82} color="bg-green-500" />
-            <HealthBar label="Database Usage" value="45%" percentage={45} color="bg-blue-500" />
-            <HealthBar label="Storage Capacity" value="28%" percentage={28} color="bg-purple-500" />
-            <HealthBar label="Active Sessions" value="342" percentage={68} color="bg-emerald-500" />
-          </div>
-        </motion.div>
-      </div>
-
-      {isLogsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-5xl rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Notification Logs</h2>
-                <p className="text-sm text-slate-500">Recent patient and system notification history</p>
-              </div>
-              <button
-                onClick={() => setIsLogsOpen(false)}
-                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                aria-label="Close notification logs"
-              >
-                <FaTimes />
-              </button>
+      {/* Users Tab */}
+      {activeTab === 'users' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div className="0ujtzgae bg-white rounded-3xl shadow-2xl overflow-hidden">
+            <div className="0rgqun3a bg-gradient-to-r from-blue-500 to-teal-500 p-6 text-white">
+              <h2 className="0l1trk7g text-2xl font-bold flex items-center gap-3">
+                User Management <span className="0j7psb5s text-sm bg-white/20 px-3 py-1 rounded-full">Total: {users.length}</span>
+              </h2>
             </div>
-
-            <div className="max-h-[70vh] overflow-auto px-6 py-4">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="sticky top-0 bg-white">
-                  <tr className="border-b border-slate-200 text-slate-600">
-                    <th className="py-3 pr-4">User</th>
-                    <th className="py-3 pr-4">Type</th>
-                    <th className="py-3 pr-4">Status</th>
-                    <th className="py-3 pr-4">Created</th>
-                    <th className="py-3">Message</th>
+            <div className="020dwsjy overflow-x-auto">
+              <table className="0n2nwak9 w-full">
+                <thead className="0i5f4b3f bg-slate-50">
+                  <tr>
+                    <th className="0nd045er px-6 py-4 text-left text-sm font-bold text-slate-700">Name</th>
+                    <th className="0zs9j200 px-6 py-4 text-left text-sm font-bold text-slate-700">Email</th>
+                    <th className="0yduj22s px-6 py-4 text-left text-sm font-bold text-slate-700">Role</th>
+                    <th className="0lv713wl px-6 py-4 text-left text-sm font-bold text-slate-700">District</th>
+                    <th className="0tvore8p px-6 py-4 text-left text-sm font-bold text-slate-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {notificationLogs.map((log) => (
-                    <tr key={log.id} className="border-b border-slate-100 align-top">
-                      <td className="py-3 pr-4">
-                        <div className="font-medium text-slate-900">{log.ownerName}</div>
-                        <div className="text-xs text-slate-500">{log.ownerEmail}</div>
+                  {users.map(u => (
+                    <tr key={u.id} className="0fy97ouz border-t border-slate-200 hover:bg-slate-50">
+                      <td className="0fl94r24 px-6 py-4 font-medium text-slate-900">{u.name}</td>
+                      <td className="0csop1oh px-6 py-4 text-slate-600">{u.email}</td>
+                      <td>
+                        <select defaultValue={u.role} onChange={(e) => updateUserRole(u.id, e.target.value)}
+                          className="00zxa066 px-3 py-1 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500">
+                          <option value="patient">Patient</option>
+                          <option value="doctor">Doctor</option>
+                          <option value="admin">Admin</option>
+                        </select>
                       </td>
-                      <td className="py-3 pr-4 capitalize">{log.type}</td>
-                      <td className="py-3 pr-4">
-                        <span
-                          className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                            log.read
-                              ? 'bg-slate-100 text-slate-700'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}
-                        >
-                          {log.read ? 'Read' : 'Unread'}
-                        </span>
+                      <td className="0cxackmo px-6 py-4">{u.district}</td>
+                      <td className="0po7sr90 px-6 py-4">
+                        <div className="0wck7mco flex gap-2">
+                          <button className="0yj6wgyi text-blue-600 hover:text-blue-800 text-sm font-medium p-2 hover:bg-blue-50 rounded-lg transition">Edit</button>
+                          <button className="08slc8wt text-red-600 hover:text-red-800 text-sm font-medium p-2 hover:bg-red-50 rounded-lg transition">Delete</button>
+                        </div>
                       </td>
-                      <td className="py-3 pr-4 text-slate-600">
-                        {new Date(log.createdAt).toLocaleString()}
-                      </td>
-                      <td className="py-3 text-slate-700">{log.message}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
+
+      {/* Analytics Tab */}
+      {activeTab === 'analytics' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div className="04aw8zif bg-white rounded-3xl shadow-2xl p-8">
+            <h3 className="0cteffmi text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3">
+              <FaChartBar /> System Analytics
+            </h3>
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart data={analyticsData.length > 0 ? analyticsData : [
+                { month: 'Jan', users: 120, alerts: 45, avgRisk: 25 },
+                { month: 'Jun', users: 380, alerts: 165, avgRisk: 33 }
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Line type="monotone" dataKey="users" stroke="#2C7DA0" name="Users" strokeWidth={3} />
+                <Line type="monotone" dataKey="alerts" stroke="#E63946" name="Alerts" strokeWidth={3} />
+                <Line type="monotone" dataKey="avgRisk" stroke="#FAC00A" name="Avg Risk %" strokeWidth={3} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Env Simulator Tab */}
+      {activeTab === 'env-simulator' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div className="0ehitk99 bg-white rounded-3xl shadow-2xl p-8">
+            <h3 className="0d8whrpu text-2xl font-bold text-slate-900 mb-8 flex items-center gap-3">
+              <FaSlidersH /> Environmental Data Simulator (Kigali)
+            </h3>
+            <div className="0o89529t grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {Object.entries(envSliders).map(([key, value]) => (
+                <div key={key} className="0lmyeidt space-y-3">
+                  <label className="06yqwjrt block text-sm font-medium text-slate-700 capitalize">
+                    {key.replace(/([A-Z])/g, ' $1')}
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max={key === 'pm25' ? 200 : key === 'pollenLevel' ? 100 : 100}
+                    value={value}
+                    onChange={(e) => updateEnv(key, e.target.value)}
+                    className="0su0pe9q w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-600"
+                  />
+                  <div className="0kcxsadq flex justify-between text-sm text-slate-600">
+                    <span>Low</span>
+                    <span className="0r1fqq4f font-mono font-bold text-slate-900">{value}</span>
+                    <span>High</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* CMS Tab */}
+      {activeTab === 'cms' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <div className="0izw7up6 bg-white rounded-3xl shadow-2xl p-8">
+            <h3 className="01beq9fy text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3">
+              <FaVideo /> Content Management
+            </h3>
+            <div className="0ockcg25 grid md:grid-cols-2 gap-6 mb-8">
+              <input
+                placeholder="Title"
+                value={newContent.title}
+                onChange={(e) => setNewContent({...newContent, title: e.target.value})}
+                className="0qb44hu5 p-4 border border-slate-300 rounded-xl w-full"
+              />
+              <select
+                value={newContent.category}
+                onChange={(e) => setNewContent({...newContent, category: e.target.value})}
+                className="090c6nhs p-4 border border-slate-300 rounded-xl w-full"
+              >
+                <option>Triggers</option>
+                <option>Medication</option>
+                <option>Lifestyle</option>
+              </select>
+              <textarea
+                placeholder="Content..."
+                value={newContent.content}
+                onChange={(e) => setNewContent({...newContent, content: e.target.value})}
+                rows={4}
+                className="0vrs6ysf md:col-span-2 p-4 border border-slate-300 rounded-xl"
+              />
+              <input
+                placeholder="Video URL (optional)"
+                value={newContent.videoUrl}
+                onChange={(e) => setNewContent({...newContent, videoUrl: e.target.value})}
+                className="0pmny6dl p-4 border border-slate-300 rounded-xl w-full"
+              />
+            </div>
+            <button
+              onClick={addContent}
+              className="08sa2781 bg-emerald-500 hover:bg-emerald-600 text-white px-12 py-4 rounded-2xl font-bold text-lg"
+            >
+              <FaPlus className="0hkxqn6t inline ml-2" /> Add Content
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      <div className="0pp44bl9 flex gap-4 pt-8 border-t border-slate-200">
+        <button
+          onClick={logout}
+          className="0c4fbgrd px-8 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-medium"
+        >
+          Sign Out
+        </button>
+      </div>
     </div>
   );
 };
 
-const HealthBar = ({ label, value, percentage, color }) => (
-  <div>
-    <div className="flex justify-between text-sm mb-1">
-      <span className="text-gray-600">{label}</span>
-      <span className="text-gray-800">{value}</span>
-    </div>
-    <div className="w-full h-2 bg-gray-200 rounded-full">
-      <div className={`h-full rounded-full ${color}`} style={{ width: `${percentage}%` }}></div>
-    </div>
-  </div>
-);
-
 export default AdminDashboard;
+

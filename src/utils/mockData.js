@@ -155,34 +155,130 @@ export const currentEnvKigali = {
   ozone: 85,
   pollenLevel: 75, // High
   temperature: 22,
-  humidity: 65
+  humidity: 65,
+  // NEW for forecast cards: Afternoon & Sunset
+  afternoonTemp: 25,
+  afternoonDesc: "Partly cloudy",
+  sunset: 1739206400 // Mock Unix timestamp ~18:00 Kigali
 };
 
 export let notifications = [
+  // Patient 3 (Marie Uwase, Kigali, pollen/dust)
   {
     id: 1,
     userId: 3,
-    message: 'High risk alert: Dust levels in Kigali are elevated. Please stay indoors.',
-    type: 'alert',
+    title: "High Pollen Alert - Kigali",
+    message: "Pollen levels are extremely high in your area today.",
+    type: "danger",
+    severity: "high",
+    location: "Kigali, Rwanda",
+    recommendations: [
+      "Stay indoors with windows closed",
+      "Take prescribed antihistamine now",
+      "Use air purifier if available",
+      "Avoid outdoor activities until 6 PM"
+    ],
     read: false,
-    createdAt: new Date().toISOString(),
+    createdAt: new Date(Date.now() - 10*60*1000).toISOString(), // 10min ago
   },
   {
     id: 2,
-    userId: 4,
-    message: 'Medication reminder: Please take your prescribed inhaler.',
-    type: 'medication',
+    userId: 3,
+    title: "Medication Reminder",
+    message: "Time for your evening Fluticasone dose.",
+    type: "warning",
+    severity: "medium",
+    location: "Home",
+    recommendations: [
+      "Take 1 puff of Fluticasone",
+      "Rinse mouth after use",
+      "Log medication in tracker"
+    ],
     read: false,
-    createdAt: new Date().toISOString(),
+    createdAt: new Date(Date.now() - 60*60*1000).toISOString(), // 1hr ago
   },
   {
     id: 3,
-    userId: 5,
-    message: 'New AI prediction: Your risk level is low today.',
-    type: 'info',
-    read: false,
-    createdAt: new Date().toISOString(),
+    userId: 3,
+    title: "Dust Warning",
+    message: "Current AQI in Kigali is poor due to dust.",
+    type: "warning",
+    severity: "medium",
+    location: "Kigali, Rwanda",
+    recommendations: [
+      "Wear N95 mask outdoors",
+      "Limit physical activity",
+      "Keep rescue inhaler nearby"
+    ],
+    read: true,
+    createdAt: new Date(Date.now() - 2*60*60*1000).toISOString(), // 2hr ago
   },
+  // Patient 4 (Jean Bizimana, Muhanga, cold air)
+  {
+    id: 4,
+    userId: 4,
+    title: "Cold Weather Alert",
+    message: "Temperature dropping below 15°C tonight - potential trigger.",
+    type: "warning",
+    severity: "medium",
+    location: "Muhanga, Rwanda",
+    recommendations: [
+      "Wear scarf over mouth/nose",
+      "Stay in warm indoor areas",
+      "Take preventive medication early"
+    ],
+    read: false,
+    createdAt: new Date(Date.now() - 3*60*60*1000).toISOString(),
+  },
+  {
+    id: 5,
+    userId: 4,
+    title: "Peak Flow Low",
+    message: "Your last reading was below personal best.",
+    type: "danger",
+    severity: "high",
+    location: "Home",
+    recommendations: [
+      "Retest peak flow now",
+      "Use rescue inhaler if <80%",
+      "Contact doctor if symptoms worsen"
+    ],
+    read: false,
+    createdAt: new Date(Date.now() - 30*60*1000).toISOString(),
+  },
+  // Patient 5 (Claudine, Rubavu, pet dander)
+  {
+    id: 6,
+    userId: 5,
+    title: "Good Control Achieved",
+    message: "30 days without rescue inhaler use - excellent adherence!",
+    type: "success",
+    severity: "low",
+    location: "System",
+    recommendations: [
+      "Continue current regimen",
+      "Schedule 3-month review",
+      "Share progress with doctor"
+    ],
+    read: true,
+    createdAt: new Date(Date.now() - 24*60*60*1000).toISOString(), // 1 day ago
+  },
+  {
+    id: 7,
+    userId: 5,
+    title: "Humidity Alert - Rubavu",
+    message: "High humidity (78%) may increase mold risk.",
+    type: "info",
+    severity: "low",
+    location: "Rubavu, Rwanda",
+    recommendations: [
+      "Use dehumidifier indoors",
+      "Check for mold in bathroom",
+      "Monitor symptoms closely"
+    ],
+    read: false,
+    createdAt: new Date(Date.now() - 4*60*60*1000).toISOString(),
+  }
 ];
 
 const dispatchNotificationUpdate = () => {

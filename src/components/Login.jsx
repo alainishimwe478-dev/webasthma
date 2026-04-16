@@ -153,6 +153,28 @@ const Login = () => {
             Login
           </button>
         </form>
+
+        <div
+          style={{
+            marginTop: "24px",
+            padding: "16px",
+            background: "#f3f8fb",
+            borderRadius: "12px",
+            border: "1px solid #d3e3f1",
+            color: "#0f3c5f",
+            fontSize: "14px",
+          }}
+        >
+          <div style={{ fontWeight: "700", marginBottom: "10px" }}>
+            Demo credentials
+          </div>
+          <div style={{ marginBottom: "6px" }}>
+            <strong>Doctor</strong>: doctor@example.com / doctor123
+          </div>
+          <div>
+            <strong>Admin</strong>: admin@example.com / admin123
+          </div>
+        </div>
       </div>
     </div>
   );

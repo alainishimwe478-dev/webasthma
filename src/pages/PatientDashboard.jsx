@@ -1,439 +1,390 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  FaSun, FaCloudRain, FaWind, FaTemperatureHigh, FaTint, FaLeaf,
-  FaExclamationTriangle, FaMoon, FaCloudSun, FaCloudMoon, FaHeartbeat,
-  FaCalendarAlt, FaClock, FaMapMarkerAlt, FaShieldAlt, FaLungs,
-  FaNotesMedical, FaChartLine, FaBell, FaUserMd, FaCloud,
-  FaSpinner, FaCheckCircle, FaArrowUp, FaArrowDown
-} from 'react-icons/fa';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  LineChart, Line, AreaChart, Area, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell
-} from 'recharts';
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
+import { currentEnvKigali } from "../utils/mockData";
+import { calculateRisk } from "../utils/aiPrediction";
+import {
+  fetchDashboardData,
+  fetchLiveEnvData,
+  getRwandaFallback,
+  WEATHER_REFRESH_MS,
+} from "../utils/environmentAPI";
+import {
+  getAqiStandard,
+  getHumidityStandard,
+  getPollenStandard,
+  getTemperatureStandard,
+} from "../utils/rwandaEnvironment";
 
-const PatientDashboard = ({ location = "Huye, Rwanda" }) => {
+import RiskMeter from "../components/RiskMeter";
+import HealthGraph from "../components/HealthGraph";
+import RecommendationFeed from "../components/RecommendationFeed";
+import EducationalHub from "../components/EducationalHub";
+import AsthmaChatbot from "../components/AsthmaChatbot";
+
+import {
+  FaMapMarkerAlt,
+  FaWind,
+  FaTint,
+  FaThermometerHalf,
+  FaMicrophone,
+  FaStop,
+  FaSignOutAlt,
+  FaBell,
+  FaChevronDown,
+} from "react-icons/fa";
+
+const fallbackEnvironment = currentEnvKigali;
+
+const LOCATIONS = {
+  Kigali: { lat: -1.9441, lon: 30.0619, label: "Kigali" },
+  Huye: { lat: -2.5858, lon: 29.7390, label: "Huye" },
+  Rubavu: { lat: -1.6851, lon: 29.2560, label: "Rubavu" },
+};
+
+const PatientDashboard = () => {
   const { user, logout } = useAuth();
-  const patientName = user?.name || "Jean";
+
+  const [selectedLocation, setSelectedLocation] = useState('Kigali');
+  const [environment, setEnvironment] = useState(fallbackEnvironment);
+  const [healthLogs, setHealthLogs] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [predictions, setPredictions] = useState([]);
+  const [riskData, setRiskData] = useState({});
+  const [recentMeds, setRecentMeds] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState('overview');
-  const [weatherData, setWeatherData] = useState(null);
-  const [symptoms, setSymptoms] = useState([]);
-  const [peakFlowReadings, setPeakFlowReadings] = useState([]);
-  const [medications, setMedications] = useState([]);
-  const [alerts, setAlerts] = useState([]);
-  const [showEmergencyGuide, setShowEmergencyGuide] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioURL, setAudioURL] = useState("");
+  const [activeAlerts, setActiveAlerts] = useState([]);
+  const [chatOpen, setChatOpen] = useState(false);
 
-  // Real weather data from AccuWeather (Huye, Rwanda)
-  const realWeatherData = {
-    current: {
-      temperature: 14,
-      feelsLike: 16,
-      condition: 'partly-cloudy',
-      humidity: 78,
-      windSpeed: 5,
-      windGusts: 12,
-      airQuality: 151,
-      airQualityText: 'Unhealthy',
-      pollenCount: 65,
-      uvIndex: 3,
-      sunrise: '6:02 AM',
-      sunset: '6:06 PM',
-      dayLength: '12 hrs 04 mins',
-      realFeelShade: 14
-    },
-    hourly: [
-      { hour: '6 AM', temp: 12, condition: 'clear', pollen: 30, aqi: 145 },
-      { hour: '8 AM', temp: 14, condition: 'partly-cloudy', pollen: 45, aqi: 151 },
-      { hour: '10 AM', temp: 18, condition: 'sunny', pollen: 65, aqi: 158 },
-      { hour: '12 PM', temp: 21, condition: 'sunny', pollen: 75, aqi: 162 },
-      { hour: '2 PM', temp: 22, condition: 'partly-cloudy', pollen: 80, aqi: 165 },
-      { hour: '4 PM', temp: 21, condition: 'cloudy', pollen: 70, aqi: 160 },
-      { hour: '6 PM', temp: 18, condition: 'clear', pollen: 50, aqi: 152 },
-      { hour: '8 PM', temp: 15, condition: 'clear', pollen: 35, aqi: 148 }
-    ],
-    forecast: [
-      { day: 'Today', high: 22, low: 12, condition: 'partly-cloudy', rain: 10, aqi: 151 },
-      { day: 'Tomorrow', high: 23, low: 13, condition: 'sunny', rain: 5, aqi: 142 },
-      { day: 'Wednesday', high: 21, low: 12, condition: 'rainy', rain: 65, aqi: 95 },
-      { day: 'Thursday', high: 20, low: 11, condition: 'rainy', rain: 75, aqi: 88 },
-      { day: 'Friday', high: 22, low: 12, condition: 'sunny', rain: 10, aqi: 120 }
-    ]
-  };
+  // Cleanup audio URL
+  useEffect(() => () => {
+    if (audioURL) URL.revokeObjectURL(audioURL);
+  }, [audioURL]);
 
-  // Sample patient data (would come from backend)
-  const patientData = {
-    peakFlow: {
-      personalBest: 450,
-      today: 380,
-      readings: [
-        { date: 'Mon', value: 420, zone: 'green' },
-        { date: 'Tue', value: 400, zone: 'yellow' },
-        { date: 'Wed', value: 380, zone: 'yellow' },
-        { date: 'Thu', value: 360, zone: 'red' },
-        { date: 'Fri', value: 370, zone: 'yellow' },
-        { date: 'Sat', value: 385, zone: 'yellow' },
-        { date: 'Sun', value: 380, zone: 'yellow' }
-      ]
-    },
-    symptoms: {
-      daily: [
-        { date: 'Mon', coughing: 2, wheezing: 1, chestTightness: 1, shortness: 1 },
-        { date: 'Tue', coughing: 3, wheezing: 2, chestTightness: 2, shortness: 1 },
-        { date: 'Wed', coughing: 4, wheezing: 3, chestTightness: 3, shortness: 2 },
-        { date: 'Thu', coughing: 5, wheezing: 4, chestTightness: 4, shortness: 3 },
-        { date: 'Fri', coughing: 3, wheezing: 2, chestTightness: 2, shortness: 2 },
-        { date: 'Sat', coughing: 2, wheezing: 1, chestTightness: 1, shortness: 1 },
-        { date: 'Sun', coughing: 3, wheezing: 2, chestTightness: 2, shortness: 1 }
-      ],
-      triggers: [
-        { name: 'Cold Air', count: 12 },
-        { name: 'Pollen', count: 8 },
-        { name: 'Exercise', count: 5 },
-        { name: 'Dust', count: 4 },
-        { name: 'Stress', count: 3 }
-      ]
-    },
-    medications: [
-      { name: 'Albuterol (Rescue)', frequency: 'As needed', lastUsed: 'Today, 8:00 AM', refill: '15 days left' },
-      { name: 'Fluticasone (Controller)', frequency: 'Twice daily', lastUsed: 'Today, 8:00 AM', refill: '30 days left' },
-      { name: 'Montelukast', frequency: 'Once daily (evening)', lastUsed: 'Yesterday, 9:00 PM', refill: '20 days left' }
-    ],
-    actionPlan: {
-      green: { range: '360-450', action: 'Continue normal activities', meds: 'Take controller meds as prescribed' },
-      yellow: { range: '225-359', action: 'Use rescue inhaler, monitor closely', meds: 'Add rescue inhaler every 4-6 hours' },
-      red: { range: '0-224', action: 'Use rescue inhaler NOW, seek medical help', meds: 'Emergency: Call doctor or 911' }
+  const loadDashboard = async () => {
+    const userId = user?.id || 3;
+    try {
+      const dashboardData = await fetchDashboardData(selectedLocation, userId);
+      
+      console.log("Backend dashboard data:", dashboardData);
+      const normalizedEnv = dashboardData.environment;
+      setEnvironment(normalizedEnv);
+      setLastUpdated(normalizedEnv.lastUpdated);
+      setHealthLogs(dashboardData.healthLogs || []);
+      setNotifications(dashboardData.notifications || []);
+      setPredictions(dashboardData.predictions || []);
+
+      // Recent meds from backend
+      const meds = (dashboardData.healthLogs || [])
+        .filter((log) => log.medicationTaken)
+        .slice(-5);
+      setRecentMeds(meds);
+
+      // Alerts from backend notifications + env standards
+      const userAlerts = (dashboardData.notifications || []).filter(n => !n.read).slice(0,3);
+      const envAlerts = [];
+      const temperatureStandard = getTemperatureStandard(normalizedEnv?.temperature ?? 0);
+      const humidityStandard = getHumidityStandard(normalizedEnv?.humidity ?? 0);
+      const aqiStandard = getAqiStandard(normalizedEnv?.aqi ?? 0);
+      if (temperatureStandard.label !== 'Good') {
+        envAlerts.push({ id: 'temp', message: `Temperature Alert: ${temperatureStandard.message || temperatureStandard.label}` });
+      }
+      if (humidityStandard.label !== 'Good') {
+        envAlerts.push({ id: 'humidity', message: `Humidity Alert: ${humidityStandard.message || humidityStandard.label}` });
+      }
+      if (aqiStandard.label !== 'Good') {
+        envAlerts.push({ id: 'aqi', message: `AQI Alert: ${aqiStandard.label}` });
+      }
+      setActiveAlerts([...envAlerts, ...userAlerts]);
+
+      // Risk from current environment
+      const risk = calculateRisk(userId, normalizedEnv);
+      setRiskData({
+        score: risk.score,
+        riskLevel: risk.riskLevel,
+      });
+
+    } catch (error) {
+      console.error("Dashboard load error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Simulate loading data
-    setTimeout(() => {
-      setWeatherData(realWeatherData);
-      setSymptoms(patientData.symptoms);
-      setPeakFlowReadings(patientData.peakFlow);
-      setMedications(patientData.medications);
-      checkAlerts();
-      setLoading(false);
-    }, 1000);
-  }, []);
+    loadDashboard();
+    const timer = setInterval(loadDashboard, WEATHER_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [selectedLocation, user?.id]);
 
-  const checkAlerts = () => {
-    const newAlerts = [];
-    
-    // Air quality alert
-    if (realWeatherData.current.airQuality > 150) {
-      newAlerts.push({
-        id: 1,
-        type: 'danger',
-        title: 'Unhealthy Air Quality',
-        message: 'Air Quality Index is 151. Limit outdoor activities. Use rescue inhaler if needed.',
-        time: new Date()
-      });
-    }
-    
-    // Peak flow alert
-    if (patientData.peakFlow.today < patientData.peakFlow.personalBest * 0.5) {
-      newAlerts.push({
-        id: 2,
-        type: 'emergency',
-        title: 'Low Peak Flow Reading',
-        message: 'Your peak flow is in the RED zone. Follow your action plan immediately.',
-        time: new Date()
-      });
-    } else if (patientData.peakFlow.today < patientData.peakFlow.personalBest * 0.8) {
-      newAlerts.push({
-        id: 3,
-        type: 'warning',
-        title: 'Yellow Zone Alert',
-        message: 'Your peak flow is below 80% of personal best. Monitor symptoms closely.',
-        time: new Date()
-      });
-    }
-    
-    setAlerts(newAlerts);
-  };
-
-  const getWeatherIcon = (condition, size = "text-3xl") => {
-    const icons = {
-      'sunny': <FaSun className={`06rjamdg ${size} text-yellow-500`} />,
-      'partly-cloudy': <FaCloudSun className={`0w4hg7xf ${size} text-gray-500`} />,
-      'cloudy': <FaCloud className={`0p3p5z5s ${size} text-gray-600`} />,
-      'rainy': <FaCloudRain className={`0baac7jw ${size} text-blue-500`} />,
-      'clear': <FaMoon className={`0z5wmy2v ${size} text-gray-400`} />
-    };
-    return icons[condition] || <FaSun className={`0mwbqzpw ${size} text-yellow-500`} />;
-  };
-
-  const getAQIColor = (aqi) => {
-    if (aqi <= 50) return 'text-green-600 bg-green-100';
-    if (aqi <= 100) return 'text-yellow-600 bg-yellow-100';
-    if (aqi <= 150) return 'text-orange-600 bg-orange-100';
-    return 'text-red-600 bg-red-100';
-  };
-
-  const getZoneColor = (zone) => {
-    switch(zone) {
-      case 'green': return 'bg-green-500';
-      case 'yellow': return 'bg-yellow-500';
-      case 'red': return 'bg-red-500';
-      default: return 'bg-gray-500';
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        const url = URL.createObjectURL(blob);
+        setAudioURL(url);
+      };
+      recorder.start();
+      setMediaRecorder(recorder);
+      setRecording(true);
+    } catch (error) {
+      console.error("Recording error:", error);
     }
   };
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+  const stopRecording = () => {
+    if (mediaRecorder?.state === "recording") {
+      mediaRecorder.stop();
+    }
+    setRecording(false);
+  };
+
+  const temperatureStandard = useMemo(
+    () => getTemperatureStandard(environment?.temperature ?? 0),
+    [environment?.temperature]
+  );
+
+  const humidityStandard = useMemo(
+    () => getHumidityStandard(environment?.humidity ?? 0),
+    [environment?.humidity]
+  );
+
+  const aqiStandard = useMemo(
+    () => getAqiStandard(environment?.aqi ?? 0),
+    [environment?.aqi]
+  );
+
+  const pollenStandard = useMemo(
+    () => getPollenStandard(environment?.pollen ?? 0),
+    [environment?.pollen]
+  );
 
   if (loading) {
     return (
-      <div className="0x0r720b min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-        <div className="0zkh38zm text-center">
-          <FaSpinner className="04yv7fb7 animate-spin text-4xl text-purple-600 mx-auto mb-4" />
-          <p className="03qg82ys text-gray-600">Loading your asthma dashboard...</p>
-        </div>
+      <div className="010mxwpu p-10 text-center text-xl font-semibold">
+        Loading Patient Dashboard...
       </div>
     );
   }
 
   return (
-    <div className="0kcyoio2 min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6">
+    <div className="0jh8z4ec min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+
       {/* Header */}
-      <div className="0gd6eyuw max-w-7xl mx-auto mb-6">
-        <div className="070sdokt bg-white rounded-2xl shadow-lg p-6">
-          <div className="0eybdzn6 flex justify-between items-start">
+      <header className="0d91paw7 bg-white shadow-md border-b sticky top-0 z-50">
+        <div className="0tjvfkxl max-w-7xl mx-auto px-6 py-5 flex justify-between items-center">
+          <div>
+            <h1 className="0jqsypdi text-3xl font-bold text-blue-700">
+              Welcome back, {user?.name || 'Patient'}
+            </h1>
+            {/* Location Selector */}
+            <div className="0kzui3bd flex items-center gap-2 mt-2">
+              <FaMapMarkerAlt className="05k06yk8 text-slate-600" />
+              <select 
+                value={selectedLocation} 
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                className="0ivefjhj bg-white border border-slate-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Object.keys(LOCATIONS).map(loc => (
+                  <option key={loc} value={loc}>{LOCATIONS[loc].label}</option>
+                ))}
+              </select>
+            </div>
+            <p className="0scu1hix text-sm text-slate-500 mt-1">
+              Last updated: {new Date(lastUpdated).toLocaleTimeString()}
+            </p>
+          </div>
+          <button
+            onClick={logout}
+            className="0ulw3rxh bg-slate-800 text-white px-5 py-2 rounded-xl flex items-center gap-2 hover:bg-slate-900 transition"
+          >
+            <FaSignOutAlt />
+            Sign Out
+          </button>
+        </div>
+      </header>
+
+      <main className="0vctyp39 max-w-7xl mx-auto px-6 py-8 grid gap-8">
+        {/* RiskMeter */}
+        <RiskMeter
+          riskScore={riskData.score || 35}
+          riskLevel={riskData.riskLevel || "Low"}
+        />
+
+        {/* Env Cards */}
+        <div className="0u7uymtu grid md:grid-cols-4 gap-6">
+          <div className={`0hdaksqa p-6 rounded-2xl shadow-lg border ${temperatureStandard.tone || 'bg-emerald-100'}`}>
+            <FaThermometerHalf className="0xg0touh text-2xl mb-2 text-emerald-600" />
+            <h3 className="0wi53uj0 text-2xl font-bold">{environment.temperature}°C</h3>
+            <p className="0p9lbasw text-sm text-slate-600">Temperature</p>
+          </div>
+          <div className={`0r4w8ubx p-6 rounded-2xl shadow-lg border ${humidityStandard.tone || 'bg-emerald-100'}`}>
+            <FaTint className="0tqfsdrw text-2xl mb-2 text-blue-600" />
+            <h3 className="086jad31 text-2xl font-bold">{environment.humidity}%</h3>
+            <p className="0jn1gtob text-sm text-slate-600">Humidity</p>
+          </div>
+          <div className={`0qzz079e p-6 rounded-2xl shadow-lg border ${aqiStandard.tone || 'bg-emerald-100'}`}>
+  <FaWind className="0482uupz text-2xl mb-2 text-amber-600" />
+  <h3 className="0s844xm0 text-2xl font-bold">{environment.aqi}</h3>
+  <p className="0th8gbvu text-sm text-slate-600">AQI</p>
+  <p className={`06vt0y6e text-xs font-medium mt-1 px-2 py-1 rounded-full w-fit ${
+    environment.source === 'OpenAQ' ? 'text-green-700 bg-green-100' : 'text-yellow-700 bg-yellow-100'
+  }`}>
+    {environment.sourceLabel ?? environment.source ?? 'Unknown'}
+  </p>
+          </div>
+          <div className={`0bkx1asd p-6 rounded-2xl shadow-lg border ${pollenStandard.tone || 'bg-emerald-100'}`}>
+            <FaWind className="0icb7b3u text-2xl mb-2 text-green-600" />
+            <h3 className="0bcjs5n1 text-2xl font-bold">{environment.pollutants ? Object.values(environment.pollutants)[0]?.toFixed(0) || 'N/A' : 'N/A'}</h3>
+            <p className="0wbicc48 text-sm text-slate-600">PM2.5</p>
+          </div>
+        </div>
+
+        {/* Chat Assistant */}
+        <div className="0l4k8c1y bg-white rounded-2xl shadow-lg p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="09cblcyl text-3xl font-bold text-gray-800">
-                Welcome back, {patientName}! 👋
-              </h1>
-              <p className="0m3zm1pb text-gray-600 mt-1 flex items-center gap-2">
-                <FaMapMarkerAlt className="00zdknec text-purple-500" />
-                {location}
-                <span className="0rctwr2x mx-2">•</span>
-                <FaCalendarAlt className="0ldi5277 text-purple-500" />
-                {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              <h2 className="text-2xl font-bold text-slate-900">Talk with your asthma assistant</h2>
+              <p className="text-sm text-slate-600 mt-2">
+                Use the chat bubble at the bottom-right corner to ask about symptoms, AQI, inhaler use, or breathing tips.
               </p>
             </div>
-            <div className="0jims6mx flex gap-2">
-              <button
-                onClick={logout}
-                className="0jznko4s bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
-              >
-                Sign Out
-              </button>
-              <button
-                onClick={() => setShowEmergencyGuide(true)}
-                className="0586j82t bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition flex items-center gap-2"
-              >
-                <FaExclamationTriangle />
-                Emergency Guide
-              </button>
+            <button
+              onClick={() => setChatOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl transition"
+            >
+              Open Chat
+            </button>
+          </div>
+        </div>
+
+        {/* Active Alerts */}
+        {activeAlerts.length > 0 && (
+          <div className="0nu1qu9r bg-red-50 border border-red-200 rounded-2xl p-6">
+            <h2 className="0b7njsxl text-xl font-bold text-red-800 mb-4">Active Alerts</h2>
+            {activeAlerts.map((alert) => (
+              <div key={alert.id} className="0q5zmwpm bg-white p-4 rounded-xl border-l-4 border-red-400 mb-3">
+                {alert.message}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Timeline */}
+        <div className="0d7zu1um bg-white rounded-2xl shadow-lg p-6">
+          <h2 className="05xlrgfy text-2xl font-bold mb-6">Today's Asthma Timeline</h2>
+          <div className="0ua9xlp1 grid md:grid-cols-3 gap-6">
+            <div className="03j3ge8z bg-yellow-50 p-6 rounded-xl border">
+              <h3 className="062d7o28 font-bold text-lg mb-2">☀️ Morning</h3>
+              <p>{environment.temperature > 20 ? 'Warm start, good for light walk' : 'Cool, bundle up'}</p>
+            </div>
+            <div className="0a7mdc9u bg-orange-50 p-6 rounded-xl border">
+              <h3 className="0o8pj0k2 font-bold text-lg mb-2">🌤️ Afternoon</h3>
+              <p>{environment.aqi > 50 ? 'AQI rising, stay indoors' : 'Safe for outdoor time'}</p>
+            </div>
+            <div className="0dfed08s bg-indigo-50 p-6 rounded-xl border">
+              <h3 className="0coxjlr9 font-bold text-lg mb-2">🌙 Evening</h3>
+              <p>{environment.humidity > 70 ? 'High humidity, use dehumidifier' : 'Stable conditions'}</p>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Alert Banner */}
-      <AnimatePresence>
-      {alerts.length > 0 && (
-        <div className="0xqkxbj0 max-w-7xl mx-auto mb-6">
-          {alerts.map(alert => (
-            <motion.div
-              key={alert.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className={`08js22mg rounded-2xl p-4 mb-3 ${
-                alert.type === 'emergency' ? 'bg-red-100 border-l-4 border-red-500' :
-                alert.type === 'danger' ? 'bg-orange-100 border-l-4 border-orange-500' :
-                'bg-yellow-100 border-l-4 border-yellow-500'
-              }`}
-            >
-              <div className="0q75vxzf flex items-start gap-3">
-                <FaExclamationTriangle className={`0xi4uaa0 ${
-                  alert.type === 'emergency' ? 'text-red-500' :
-                  alert.type === 'danger' ? 'text-orange-500' :
-                  'text-yellow-500'
-                } text-xl mt-0.5`} />
-                <div className="0u4ahue5 flex-1">
-                  <h4 className="0ye0hrgd font-bold text-gray-800">{alert.title}</h4>
-                  <p className="0asa7i7k text-sm text-gray-700">{alert.message}</p>
-                  <p className="0lec8os5 text-xs text-gray-500 mt-1">
-                    {alert.time.toLocaleTimeString()}
-                  </p>
-                </div>
+        {/* Predictions & Recommendations */}
+        <div className="0iqz9675 grid md:grid-cols-2 gap-6">
+          <div className="0fnbsb69 bg-white rounded-2xl shadow-lg p-6">
+            <h2 className="0oxj1prb text-2xl font-bold mb-4">Predicted Symptoms</h2>
+            {riskData.score > 70 ? (
+              <div className="0lb40z8s space-y-3">
+                <div className="0mopxhq7 bg-red-50 p-4 rounded-xl border-l-4 border-red-400">⚠️ Wheezing possible</div>
+                <div className="00du6hym bg-red-50 p-4 rounded-xl border-l-4 border-red-400">⚠️ Chest tightness</div>
+                <div className="0ppm8z2x bg-red-50 p-4 rounded-xl border-l-4 border-red-400">⚠️ Shortness of breath</div>
               </div>
-            </motion.div>
-          ))}
+            ) : (
+              <div className="0f8w8iyu bg-green-50 p-6 rounded-xl border-l-4 border-green-400 text-center">
+                ✅ Symptoms stable today
+              </div>
+            )}
+          </div>
+          <div className="0f6icqsv bg-white rounded-2xl shadow-lg p-6">
+            <h2 className="0148iv1t text-2xl font-bold mb-4">Today's Recommendations</h2>
+            <div className="0nnybk8z space-y-3">
+              <div className="0or6ytgx bg-blue-50 p-4 rounded-xl border-l-4 border-blue-400">💨 Carry your inhaler everywhere</div>
+              <div className="0vutxtmd bg-blue-50 p-4 rounded-xl border-l-4 border-blue-400">😷 Wear mask if AQI &gt; 50</div>
+              <div className="0wyesrdr bg-blue-50 p-4 rounded-xl border-l-4 border-blue-400">💧 Stay hydrated with warm fluids</div>
+              {riskData.score > 50 && (
+                <div className="0fhvxw8u bg-orange-50 p-4 rounded-xl border-l-4 border-orange-400">🚨 Limit outdoor activity</div>
+              )}
+            </div>
+          </div>
         </div>
-      )}
-      </AnimatePresence>
 
-      {/* Navigation Tabs */}
-      <div className="0yy9m4wv max-w-7xl mx-auto mb-6">
-        <div className="0ghnt7ny flex gap-2 border-b border-gray-200 pb-1">
-          {['overview', 'weather', 'symptoms', 'medications', 'analytics'].map(tab => (
+        {riskData.score > 70 && (
+          <div className="0ocgnm4i bg-red-100 border-l-4 border-red-400 p-6 rounded-xl">
+            <h2 className="021d63zb text-2xl font-bold text-red-800 mb-3">🚨 Emergency Warning</h2>
+            <p className="0jhf3aiz text-lg">High risk detected. Use rescue inhaler if symptoms start. Contact doctor.</p>
+          </div>
+        )}
+
+        {/* Recent Medications */}
+        <div className="0amgubos bg-white rounded-2xl shadow-lg p-6">
+          <h2 className="01h2os1p text-xl font-bold mb-4">Recent Medications</h2>
+          {recentMeds.length ? (
+            recentMeds.map((med, index) => (
+              <div key={index} className="0nowv4bt border-b pb-3 mb-3 last:border-b-0">
+                <span className="09573oyy font-medium">{med.medicationTaken}</span>
+                <span className="0zzhwrd4 text-sm text-slate-500 ml-2">{new Date(med.timestamp).toLocaleDateString()}</span>
+              </div>
+            ))
+          ) : (
+            <p>No recent medication logs</p>
+          )}
+        </div>
+
+        {/* Existing Components */}
+        <HealthGraph data={healthLogs.slice(-7)} />
+        <RecommendationFeed predictions={predictions} />
+        <EducationalHub />
+
+        {/* Voice Logger */}
+        <div className="04z5rtxk bg-white rounded-2xl shadow-lg p-6">
+          <h2 className="0x6c9s37 text-xl font-bold mb-4">Voice Symptom Logger</h2>
+          {!recording ? (
             <button
-              key={tab}
-              onClick={() => setSelectedTab(tab)}
-              className={`0fyfvhv0 px-6 py-3 font-semibold transition-all duration-200 ${
-                selectedTab === tab
-                  ? 'text-purple-600 border-b-2 border-purple-600 shadow-md'
-                  : 'text-gray-600 hover:text-purple-600 hover:bg-gray-50 rounded-t-lg'
-              }`}
+              onClick={startRecording}
+              className="03ypdaw0 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 font-medium transition"
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              <FaMicrophone />
+              Start Recording Symptoms
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="0kj9q9nk max-w-7xl mx-auto">
-        {selectedTab === 'overview' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="0kfh0gb0 space-y-6"
-          >
-            {/* Quick Stats */}
-            <div className="091ixnx7 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="0hjrrz4m bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
-                <div className="0mxpzl7r flex items-center justify-between mb-2">
-                  <FaLungs className="0c2msysn text-3xl text-purple-500" />
-                  <span className={`0e3zyzvk px-2 py-1 rounded-full text-xs font-semibold ${
-                    patientData.peakFlow.today >= patientData.peakFlow.personalBest * 0.8 ? 'bg-green-100 text-green-700' :
-                    patientData.peakFlow.today >= patientData.peakFlow.personalBest * 0.5 ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {patientData.peakFlow.today >= patientData.peakFlow.personalBest * 0.8 ? 'Green Zone' :
-                     patientData.peakFlow.today >= patientData.peakFlow.personalBest * 0.5 ? 'Yellow Zone' : 'Red Zone'}
-                  </span>
-                </div>
-                <h3 className="0p1v7jl6 text-gray-600 text-sm">Peak Flow Today</h3>
-                <p className="0ctf5dg3 text-2xl font-bold text-gray-900">{patientData.peakFlow.today} L/min</p>
-                <p className="0x1c9rh5 text-xs text-gray-500">Personal best: {patientData.peakFlow.personalBest}</p>
-              </div>
-
-              <div className="0r4eclut bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
-                <div className="0jebh008 flex items-center justify-between mb-2">
-                  <FaTemperatureHigh className="0rsvf5rz text-3xl text-orange-500" />
-                  <span className="09r9eals text-xs text-gray-500">RealFeel®</span>
-                </div>
-                <h3 className="0g2t3i3w text-gray-600 text-sm">Temperature</h3>
-                <p className="08g13k76 text-2xl font-bold text-orange-600">{weatherData.current.temperature}°C</p>
-                <p className="081b0yld text-xs text-gray-500">Feels like {weatherData.current.feelsLike}°C</p>
-              </div>
-
-              <div className="0gi4wu9m bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
-                <div className="09sr8tkj flex items-center justify-between mb-2">
-                  <FaLeaf className="0kjqoyk8 text-3xl text-green-500" />
-                  <span className="0v5djbx9 text-xs text-gray-500">Pollen Count</span>
-                </div>
-                <h3 className="0ve31026 text-gray-600 text-sm">Pollen Level</h3>
-                <p className="0apg3spw text-2xl font-bold text-green-600">{weatherData.current.pollenCount}</p>
-                <p className="0yx1utui text-xs text-gray-500">{weatherData.current.pollenCount > 60 ? 'High' : weatherData.current.pollenCount > 30 ? 'Moderate' : 'Low'}</p>
-              </div>
-
-              <div className="0s8v1qa9 bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
-                <div className="0g98hnut flex items-center justify-between mb-2">
-                  <FaShieldAlt className="0lelfxe3 text-3xl text-blue-500" />
-                  <span className="02024uy0 text-xs text-gray-500">AQI</span>
-                </div>
-                <h3 className="0spun5nz text-gray-600 text-sm">Air Quality</h3>
-                <p className={`02os2hvc text-2xl font-bold ${getAQIColor(weatherData.current.airQuality)}`}>
-                  {weatherData.current.airQuality}
-                </p>
-                <p className={`0ye2j0d9 text-xs ${getAQIColor(weatherData.current.airQuality).replace('bg-', 'text-')}`}>{weatherData.current.airQualityText}</p>
-              </div>
-            </div>
-
-            {/* Charts and sections continue - full implementation as per user code */}
-            {/* Peak Flow Chart */}
-            <div className="066p6qnr bg-white rounded-2xl p-6 shadow-lg">
-              <h3 className="0vrhnc5j font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <FaChartLine className="0opagej1 text-purple-500" />
-                Peak Flow Readings (Last 7 Days)
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={patientData.peakFlow.readings}>
-                  <defs>
-                    <linearGradient id="peakFlowColor" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis domain={[0, 500]} />
-                  <Tooltip />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#8884d8"
-                    fillOpacity={1}
-                    fill="url(#peakFlowColor)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-              <div className="0v21bsav flex justify-center gap-4 mt-4 text-xs">
-                <div className="0bwm8h7c flex items-center gap-2">
-                  <div className="0l4qepg8 w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span>Green Zone (80-100%)</span>
-                </div>
-                <div className="0egi08b6 flex items-center gap-2">
-                  <div className="04c07j22 w-3 h-3 bg-yellow-500 rounded-full"></div>
-                  <span>Yellow Zone (50-80%)</span>
-                </div>
-                <div className="096e10ut flex items-center gap-2">
-                  <div className="0yujpuwd w-3 h-3 bg-red-500 rounded-full"></div>
-Red Zone (<50%)
-                </div>
-              </div>
-            </div>
-
-            {/* Note: Full content for other sections (weather, symptoms, etc.) would be included here, but truncated for response */}
-            {/* Include all tabs: weather, symptoms, medications, analytics with their charts and data */}
-            {/* Emergency modal at end */}
-          </motion.div>
-        )}
-
-        {/* Other tabs: weather, symptoms, medications, analytics - full code from user message */}
-
-      </div>
-
-      {/* Emergency Guide Modal - full code from user */}
-      <AnimatePresence>
-        {showEmergencyGuide && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="0j8xs0lk fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowEmergencyGuide(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 50 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 50 }}
-              className="0ymyzty3 bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-8 shadow-2xl"
-              onClick={e => e.stopPropagation()}
+          ) : (
+            <button
+              onClick={stopRecording}
+              className="0ijaachh bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 font-medium transition"
             >
-              {/* Full emergency guide content */}
-              <h2 className="0cuoshwp text-2xl font-bold text-red-600 mb-6">🚨 Emergency Asthma Guide</h2>
-              {/* ... full modal content ... */}
-              <button
-                onClick={() => setShowEmergencyGuide(false)}
-                className="0ura60m0 w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 mt-6"
-              >
-                I Understand
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <FaStop />
+              Stop Recording
+            </button>
+          )}
+          {audioURL && (
+            <audio src={audioURL} controls className="06ginpkq mt-4 w-full" />
+          )}
+        </div>
+      </main>
 
+      {/* Chatbot */}
+      <div className="0ozqjb88 fixed bottom-6 right-6 z-[9999]">
+        <AsthmaChatbot environment={environment} user={user} open={chatOpen} onOpenChange={setChatOpen} />
+      </div>
     </div>
   );
 };
 
 export default PatientDashboard;
+

@@ -6,6 +6,7 @@ import {
   FaUserInjured,
   FaUserMd,
   FaUserShield,
+  FaRobot,
 } from "react-icons/fa";
 import toast from "react-hot-toast";
 import AdminShell from "../components/Layout/AdminShell";
@@ -16,6 +17,8 @@ import {
   getUsers,
   updateManagedUser,
 } from "../utils/mockData";
+import { getRwandaFallback } from "../utils/environmentAPI";
+import AsthmaChatbot from "../components/AsthmaChatbot";
 
 const roleStyles = {
   admin: "bg-purple-50 text-purple-700",
@@ -48,6 +51,7 @@ const ManageUsers = () => {
   const [directory, setDirectory] = useState(() => getUsers());
   const [formData, setFormData] = useState(emptyForm);
   const [editingUserId, setEditingUserId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const syncUsers = () => setDirectory(getUsers());
@@ -60,10 +64,19 @@ const ManageUsers = () => {
     [directory],
   );
 
+  const filteredDirectory = useMemo(() => 
+    directory.filter(account => 
+      account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      account.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      account.role.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    [directory, searchTerm]
+  );
+
   const stats = useMemo(
     () => ({
       total: directory.length,
-      doctors: directory.filter((account) => account.role === "doctor").length,
+      doctors: doctors.length,
       patients: directory.filter((account) => account.role === "patient").length,
     }),
     [directory],
@@ -88,7 +101,7 @@ const ManageUsers = () => {
     setFormData({
       name: account.name || "",
       email: account.email || "",
-      password: account.password || "",
+      password: "",
       role: account.role || "patient",
       district: account.district || "Kigali",
       phone: account.phone || "",
@@ -183,48 +196,50 @@ const ManageUsers = () => {
 
   return (
     <AdminShell>
-      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="0obekjed max-w-7xl mx-auto space-y-6 p-6">
+
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="02zwzc7w text-3xl font-bold text-gray-900">User Management</h1>
+          <p className="0d4v862s mt-2 text-gray-600">
             Add, edit, and delete doctor, patient, or admin accounts from one form.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard label="Total accounts" value={stats.total} tone="text-gray-900" />
+        <div className="05dcmr4b grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatCard label="Total accounts" value={stats.total} />
           <StatCard label="Doctors" value={stats.doctors} tone="text-blue-700" />
           <StatCard label="Patients" value={stats.patients} tone="text-emerald-700" />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[360px,1fr] gap-6">
-          <div className="bg-white rounded-2xl shadow-sm border p-6">
-            <div className="flex items-center justify-between mb-5">
+        <div className="01k4h3y0 grid grid-cols-1 xl:grid-cols-[360px,1fr] gap-6">
+          <div className="06w2gw4j bg-white rounded-2xl shadow-sm border p-6">
+            <div className="00sslvfo flex items-center justify-between mb-5">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="0kooy50v text-xl font-semibold text-gray-900">
                   {editingUserId ? "Edit Account" : "Create Account"}
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="0mnu7391 text-sm text-gray-500 mt-1">
                   Use this form to manage doctors and patients directly from admin.
                 </p>
               </div>
               {editingUserId && (
                 <button
                   onClick={resetForm}
-                  className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                  className="0uhd4j03 text-sm font-medium text-blue-600 hover:text-blue-700"
                 >
                   Cancel
                 </button>
               )}
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="0z6a4tdd space-y-4">
               <FormField label="Full Name">
                 <input
                   value={formData.name}
                   onChange={(e) => handleChange("name", e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  className="08e7h476 w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   placeholder="Enter full name"
+                  required
                 />
               </FormField>
 
@@ -233,27 +248,29 @@ const ManageUsers = () => {
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleChange("email", e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  className="0iz6rsya w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   placeholder="name@example.com"
+                  required
                 />
               </FormField>
 
               <FormField label="Password">
                 <input
-                  type="text"
+                  type="password"
                   value={formData.password}
                   onChange={(e) => handleChange("password", e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  className="0dwm428a w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   placeholder="Enter password"
+                  required
                 />
               </FormField>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="0kp78020 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Role">
                   <select
                     value={formData.role}
                     onChange={(e) => handleChange("role", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="0v13ef8t w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="patient">Patient</option>
                     <option value="doctor">Doctor</option>
@@ -265,7 +282,7 @@ const ManageUsers = () => {
                   <select
                     value={formData.district}
                     onChange={(e) => handleChange("district", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="05kw5xlz w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   >
                     {districts.map((district) => (
                       <option key={district} value={district}>
@@ -276,12 +293,12 @@ const ManageUsers = () => {
                 </FormField>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="0cs8vx6c grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Phone">
                   <input
                     value={formData.phone}
                     onChange={(e) => handleChange("phone", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="0d2o9bzg w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     placeholder="+250..."
                   />
                 </FormField>
@@ -290,9 +307,10 @@ const ManageUsers = () => {
                   <input
                     type="number"
                     min="0"
+                    max="120"
                     value={formData.age}
                     onChange={(e) => handleChange("age", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="0fv5zco8 w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     placeholder="Optional"
                   />
                 </FormField>
@@ -303,8 +321,8 @@ const ManageUsers = () => {
                   <input
                     value={formData.specialty}
                     onChange={(e) => handleChange("specialty", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    placeholder="Pulmonology"
+                    className="0rmp81eo w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    placeholder="Pulmonology, General Medicine, etc."
                   />
                 </FormField>
               )}
@@ -314,12 +332,12 @@ const ManageUsers = () => {
                   <select
                     value={formData.assignedDoctorId}
                     onChange={(e) => handleChange("assignedDoctorId", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="0m4ravy1 w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="">No doctor assigned</option>
                     {doctors.map((doctor) => (
                       <option key={doctor.id} value={doctor.id}>
-                        {doctor.name}
+                        {doctor.name} ({doctor.specialty || 'General'})
                       </option>
                     ))}
                   </select>
@@ -328,7 +346,7 @@ const ManageUsers = () => {
 
               <button
                 type="submit"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700"
+                className="0eo21oa0 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <FaPlus />
                 {editingUserId ? "Save Changes" : "Create Account"}
@@ -336,16 +354,26 @@ const ManageUsers = () => {
             </form>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-semibold text-gray-900">Directory</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Edit or delete accounts directly from this admin table.
+          <div className="0piztyze bg-white rounded-2xl shadow-sm border overflow-hidden">
+            <div className="0dgv5kaq p-6 border-b bg-gray-50">
+              <h2 className="0n82fm09 text-xl font-semibold text-gray-900">Directory ({filteredDirectory.length})</h2>
+              <p className="0wuh5pyq mt-1 text-sm text-gray-500">
+                Search and manage all user accounts.
               </p>
             </div>
 
-            <div className="divide-y">
-              {directory.map((account) => {
+            <div className="0m0wbs3m p-4 border-b">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by name, email, or role..."
+                className="0mmwlial w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <div className="0vsgov4x max-h-96 overflow-y-auto">
+              {filteredDirectory.map((account) => {
                 const Icon = roleIcons[account.role] || FaUserShield;
                 const assignedDoctor = doctors.find(
                   (doctor) => doctor.id === account.assignedDoctorId,
@@ -354,40 +382,42 @@ const ManageUsers = () => {
                 return (
                   <div
                     key={account.id}
-                    className="p-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
+                    className="0co10w8m p-6 hover:bg-gray-50 transition-colors border-b last:border-b-0 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
                   >
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center">
-                        <Icon className="text-gray-700" />
+                    <div className="0iarigyf flex items-start gap-4">
+                      <div className="0yo1h3gg w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <Icon className="0eome0pw text-gray-700 text-lg" />
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{account.name}</h3>
-                        <p className="text-sm text-gray-500">{account.email}</p>
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
-                          <span>{account.district || "No district"}</span>
+                      <div className="0zjb629p min-w-0 flex-1">
+                        <h3 className="0dfzwbpo font-semibold text-gray-900 truncate">{account.name}</h3>
+                        <p className="0u85ryzi text-sm text-gray-500 truncate">{account.email}</p>
+                        <div className="0ogyz4qz mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
+                          <span className="04segbp5 px-2 py-1 bg-gray-100 rounded-full">{account.role}</span>
+                          <span>{account.district}</span>
                           {account.phone && <span>{account.phone}</span>}
                           {account.specialty && <span>{account.specialty}</span>}
                           {assignedDoctor && <span>Doctor: {assignedDoctor.name}</span>}
+                          {account.age && <span>Age {account.age}</span>}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="0bi3idfs flex flex-wrap items-center gap-3 ml-auto">
                       <span
-                        className={`px-3 py-1 rounded-full text-sm font-medium ${roleStyles[account.role] || "bg-gray-50 text-gray-700"}`}
+                        className={`0133s28u px-3 py-1 rounded-full text-sm font-medium ${roleStyles[account.role] || "bg-gray-50 text-gray-700"}`}
                       >
                         {account.role}
                       </span>
                       <button
                         onClick={() => handleEdit(account)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                        className="00yrl73a inline-flex items-center gap-2 rounded-xl border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 transition-all"
                       >
                         <FaEdit />
                         Edit
                       </button>
                       <button
                         onClick={() => handleDelete(account)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
+                        className="0bwhy3pb inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 transition-all"
                       >
                         <FaTrash />
                         Delete
@@ -396,24 +426,34 @@ const ManageUsers = () => {
                   </div>
                 );
               })}
+              {filteredDirectory.length === 0 && (
+                <div className="0nn5t1be p-12 text-center text-gray-500">
+                  No users match your search. Try a different term.
+                </div>
+              )}
             </div>
           </div>
+        </div>
+
+        {/* Fixed position chatbot */}
+        <div className="0vqtku1o fixed bottom-6 right-6 z-[9999]">
+          <AsthmaChatbot environment={getRwandaFallback()} user={user} />
         </div>
       </div>
     </AdminShell>
   );
 };
 
-const StatCard = ({ label, value, tone }) => (
-  <div className="bg-white rounded-2xl shadow-sm border p-6">
-    <p className="text-sm text-gray-500">{label}</p>
-    <p className={`text-3xl font-bold mt-2 ${tone}`}>{value}</p>
+const StatCard = ({ label, value, tone = "text-gray-900" }) => (
+  <div className="0k06j8n5 p-6 bg-white border shadow-sm rounded-2xl">
+    <p className="0tzu0jzm uppercase tracking-wide text-sm font-medium text-gray-500">{label}</p>
   </div>
 );
-
-const FormField = ({ label, children }) => (
-  <label className="block">
-    <span className="mb-1.5 block text-sm font-medium text-gray-700">{label}</span>
+const FormField = ({ label, children, required = false }) => (
+  <label className="03ge5hf5 block">
+    <span className="0f84rg7p block mb-1.5 text-sm font-medium text-gray-700">
+      {label} {required && <span className="04eo7ipc text-red-500">*</span>}
+    </span>
     {children}
   </label>
 );

@@ -1,107 +1,273 @@
-const API_KEY = import.meta.env.VITE_OWM_API_KEY;
+import { RWANDA_LOCATIONS, normalizeEnvironmentData } from './rwandaEnvironment.js';
+import { currentEnvKigali } from './mockData.js';
+import { calculateRisk } from './aiPrediction.js';
 
-export const RWANDA_DEFAULT_LOCATION = { lat: -1.9403, lng: 29.8739 };
+// Mock AQI data for Rwanda (existing)
+const MOCK_AQI = {
+  kigali: 75,
+  butare: 60,
+  ruhengeri: 50,
+  gisenyi: 55,
+  cyangugu: 65,
+};
 
-export const WEATHER_REFRESH_MS = 300000;
+// NEW: Mock full env data for weather fallback (task)
+const MOCK_ENV = {
+  kigali: { aqi: 75, temp: 22, humidity: 55 },
+  butare: { aqi: 60, temp: 23, humidity: 60 },
+  ruhengeri: { aqi: 50, temp: 20, humidity: 50 },
+  gisenyi: { aqi: 55, temp: 21, humidity: 65 },
+  cyangugu: { aqi: 65, temp: 24, humidity: 70 },
+};
 
-export const fetchLiveEnvData = async (lat, lon, label) => {
+// Existing
+const IS_DEV = import.meta.env.MODE === 'development'; // Vite: MODE
+
+// NEW: OWM API key from env (Vite prefix)
+const OWM_API_KEY = import.meta.env.VITE_OWM_KEY || 'demo';
+
+/**
+ * Existing: Fetch AQI for a city.
+ */
+export const fetchAQI = async (city = 'kigali') => {
+  const cityKey = city.toLowerCase();
+  const location = RWANDA_LOCATIONS[cityKey];
+
+  if (!location) {
+    throw new Error(`City "${city}" not found in RWANDA_LOCATIONS`);
+  }
+
+  if (IS_DEV) {
+    return {
+      city,
+      aqi: MOCK_AQI[cityKey] || null,
+      parameter: 'pm25',
+      source: 'Mock',
+    };
+  }
+
+  const { lat, lon } = location;
+
   try {
     const response = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`,
+      `https://api.openaq.org/v2/latest?coordinates=${lat},${lon}&radius=10000&limit=1`
     );
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        const errorMsg = "Unauthorized: Invalid OpenWeatherMap API key. Please check your .env file.";
-        console.error("Weather API Error:", errorMsg);
-        return {
-          ...getRwandaFallback(),
-          location: label || "Kigali (fallback)",
-          source: "fallback",
-          error: errorMsg,
-        };
-      } else if (response.status === 404) {
-        const errorMsg = "Location not found. Check latitude/longitude.";
-        console.error("Weather API Error:", errorMsg);
-        return {
-          ...getRwandaFallback(),
-          location: label || "Unknown location (fallback)",
-          source: "fallback",
-          error: errorMsg,
-        };
-      } else {
-        throw new Error(`Weather fetch failed with status ${response.status}`);
-      }
-    }
 
     const data = await response.json();
 
+    if (data.results && data.results.length > 0 && data.results[0].measurements.length > 0) {
+      return {
+        city,
+        aqi: data.results[0].measurements[0].value,
+        parameter: data.results[0].measurements[0].parameter,
+        source: 'OpenAQ',
+      };
+    } else {
+      return {
+        city,
+        aqi: MOCK_AQI[cityKey] || null,
+        parameter: 'pm25',
+        source: 'Mock',
+      };
+    }
+  } catch (err) {
+    console.warn(`OpenAQ fetch failed for ${city}, using mock data`, err);
     return {
-      temperature: Math.round(data.main.temp),
-      humidity: data.main.humidity,
-      windSpeed: Math.round(data.wind.speed),
+      city,
+      aqi: MOCK_AQI[cityKey] || null,
+      parameter: 'pm25',
+      source: 'Mock',
+    };
+  }
+};
+
+/**
+ * NEW (task): Fetch environment data (AQI + weather) for a city
+ */
+export const fetchEnvironment = async (city = 'kigali') => {
+  const cityKey = city.toLowerCase();
+  const location = RWANDA_LOCATIONS[cityKey];
+
+  if (!location) throw new Error(`City "${city}" not found`);
+
+  const timestamp = new Date().toISOString();
+
+  if (IS_DEV) {
+    return { ...MOCK_ENV[cityKey], source: 'Mock', lastUpdated: timestamp };
+  }
+
+  const { lat, lon } = location;
+
+  try {
+    // Fetch AQI (existing logic)
+    const aqiResp = await fetch(
+      `https://api.openaq.org/v2/latest?coordinates=${lat},${lon}&radius=10000&limit=1`
+    );
+    const aqiData = await aqiResp.json();
+    const aqi =
+      aqiData.results?.[0]?.measurements?.[0]?.value ??
+      MOCK_ENV[cityKey].aqi;
+
+    // NEW: Fetch weather
+    const weatherResp = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${OWM_API_KEY}`
+    );
+    const weatherData = await weatherResp.json();
+    const temp = weatherData.main?.temp ?? MOCK_ENV[cityKey].temp;
+    const humidity = weatherData.main?.humidity ?? MOCK_ENV[cityKey].humidity;
+
+    return { aqi, temp, humidity, source: 'Live', lastUpdated: timestamp };
+  } catch (err) {
+    console.warn(`Fetch failed for ${city}, using mock`, err);
+    return { ...MOCK_ENV[cityKey], source: 'Mock', lastUpdated: timestamp };
+  }
+};
+
+// NEW (task): Fetch all cities
+export const fetchAllEnvironments = async () => {
+  const envData = {};
+  for (const city in RWANDA_LOCATIONS) {
+    envData[city] = await fetchEnvironment(city);
+  }
+  return envData;
+};
+
+// Existing BACKWARD COMPATIBILITY
+export const fetchDashboardData = async (locationLabel = 'kigali', userId) => {
+  try {
+    const cityKey = locationLabel.toLowerCase();
+
+    // Pull live/mock environment (temp, humidity, AQI) per city
+    const env = await fetchEnvironment(cityKey);
+
+    // Normalize shape expected by UI
+    const normalized = normalizeEnvironmentData({
+      ...currentEnvKigali,
+      aqi: env.aqi,
+      temperature: env.temp,
+      humidity: env.humidity,
+      source: env.source,
+      sourceLabel: env.source === 'Live' ? 'OpenAQ + OWM (live)' : env.source,
+      sourceUrl: env.source === 'Live' ? 'https://openweathermap.org' : null,
+      location: locationLabel,
+      lastUpdated: env.lastUpdated,
+    });
+
+    // Risk expectation from current environment
+    const risk = calculateRisk(userId ?? 3, normalized);
+
+    return {
+      environment: normalized,
+      healthLogs: [],
+      notifications: [],
+      predictions: [
+        {
+          prediction: risk.riskLevel,
+          confidence: risk.score / 100,
+        },
+      ],
+    };
+  } catch (err) {
+    console.error('Dashboard fetch failed:', err);
+    const normalized = normalizeEnvironmentData(currentEnvKigali);
+    return {
+      environment: normalized,
+      healthLogs: [],
+      notifications: [],
+      predictions: [{ prediction: 'stable', confidence: 0.65 }],
+    };
+  }
+};
+
+export const getAllLocations = () => RWANDA_LOCATIONS;
+
+export const fetchFullForecast = async (lat, lon) => {
+  const timestamp = new Date().toISOString();
+  if (IS_DEV) {
+    return {
+      afternoonTemp: currentEnvKigali.afternoonTemp,
+      afternoonDesc: currentEnvKigali.afternoonDesc,
+      sunset: currentEnvKigali.sunset,
+      lastUpdated: timestamp
+    };
+  }
+  try {
+    // OWM One Call API 3.0 for hourly forecast & daily sunset
+    const url = `https://api.openweathermap.org/data/3.0/onecall?lat=\${lat}&lon=\${lon}&exclude=minutely,alerts&appid=\${OWM_API_KEY}&units=metric`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    // Afternoon avg (hours 14-17)
+    const afternoonHours = data.hourly?.slice(14, 18) || [];
+    const avgTemp = afternoonHours.reduce((sum, h) => sum + (h.temp || 0), 0) / afternoonHours.length;
+    const desc = afternoonHours[0]?.weather[0]?.description || 'clear';
+
+    return {
+      afternoonTemp: Math.round(avgTemp),
+      afternoonDesc: desc.charAt(0).toUpperCase() + desc.slice(1),
+      sunset: data.daily?.[0]?.sunset || 0,
+      lastUpdated: timestamp
+    };
+  } catch (err) {
+    console.warn('Forecast fetch failed:', err);
+    return {
+      afternoonTemp: 25,
+      afternoonDesc: "Clear",
+      sunset: Date.now() / 1000 + 7200,
+      lastUpdated: timestamp
+    };
+  }
+};
+
+export const fetchLiveEnvData = async (lat, lon, label) => {
+  if (IS_DEV) return currentEnvKigali;
+
+  try {
+    // Current + forecast
+    const [currentResp, forecast] = await Promise.all([
+      fetch(`https://api.openweathermap.org/data/2.5/weather?lat=\${lat}&lon=\${lon}&units=metric&appid=\${OWM_API_KEY}`),
+      fetchFullForecast(lat, lon)
+    ]);
+    const currentData = await currentResp.json();
+    const env = {
+      ...currentData,
       location: label,
-      source: "openweathermap",
-      sourceLabel: "OpenWeatherMap",
-      sourceUrl: "https://openweathermap.org/",
-      lastUpdated: new Date().toISOString(),
-
-      aqi: 45,
-      uvIndex: 4,
-      realFeelShade: Math.round(data.main.feels_like),
-      windDirection: getWindDirection(data.wind.deg),
-      airQualityStatus: "Moderate",
+      aqi: 50, // Stub - integrate OpenAQ separately
+      afternoonTemp: forecast.afternoonTemp,
+      afternoonDesc: forecast.afternoonDesc,
+      sunset: forecast.sunset,
+      lastUpdated: forecast.lastUpdated
     };
-  } catch (error) {
-    console.error("Weather API Error:", error.message || error);
-    return {
-      ...getRwandaFallback(),
-      location: label || "Kigali (fallback)",
-      source: "fallback",
-      error: error.message || "Failed to fetch weather data",
-    };
+    return env;
+  } catch (err) {
+    console.warn('Live env failed:', err);
+    return currentEnvKigali;
   }
 };
 
-export const normalizeEnvironmentData = (data) => {
-  // Pass through error if present
-  if (data.error) {
-    return { ...data };
+export const getRwandaFallback = () => currentEnvKigali;
+
+export const WEATHER_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+
+// Existing chatbot stub
+export const fetchChatbotResponse = async (question, environment, user) => {
+  const lowerQ = question.toLowerCase();
+  let reply = "Thanks for sharing. Monitor your symptoms and use your inhaler if needed.";
+  let severity = 'normal';
+
+  if (lowerQ.includes('wheezing') || lowerQ.includes('shortness')) {
+    reply = "That sounds concerning. Use your rescue inhaler now and contact your doctor if it persists >15 min.";
+    severity = 'high';
+  } else if (lowerQ.includes('chest') || lowerQ.includes('tight')) {
+    reply = "Chest tightness can be serious. Sit upright, try pursed lip breathing, and use inhaler PRN.";
+    severity = 'medium';
+  } else if (lowerQ.includes('aqi') || lowerQ.includes('air')) {
+    const std = environment.aqi <= 50 ? 'Good' : environment.aqi <= 100 ? 'Moderate' : 'Poor';
+    reply = `Current AQI is ${environment.aqi} (${std}). ${environment.aqi > 100 ? 'Stay indoors.' : 'Good conditions.'}`;
+  } else if (lowerQ.includes('humidity') || lowerQ.includes('weather')) {
+    const std = environment.humidity <= 60 ? 'Good' : 'Caution';
+    reply = `Humidity ${environment.humidity}% (${std}). ${environment.humidity > 70 ? 'Use dehumidifier.' : 'OK'}`;
   }
-  return {
-    ...data,
-    temperature: data.temperature ?? 24,
-    humidity: data.humidity ?? 55,
-    aqi: data.aqi ?? 45,
-    pollen: data.pollen ?? 50,
-    uvIndex: data.uvIndex ?? 4,
-    realFeelShade: data.realFeelShade ?? 25,
-    windSpeed: data.windSpeed ?? 10,
-    windDirection: data.windDirection ?? "NE",
-    airQualityStatus: data.airQualityStatus ?? "Moderate",
-  };
-};
 
-export const getRwandaFallback = () => ({
-  temperature: 24,
-  humidity: 58,
-  aqi: 42,
-  uvIndex: 5,
-  realFeelShade: 25,
-  windSpeed: 8,
-  windDirection: "NE",
-  pollen: 50,
-  airQualityStatus: "Moderate",
-  location: "Kigali",
-  source: "fallback",
-  sourceLabel: "Fallback Rwanda Weather",
-  sourceUrl: "https://openweathermap.org/",
-  lastUpdated: new Date().toISOString(),
-});
-
-const getWindDirection = (deg = 0) => {
-  if (deg >= 45 && deg < 135) return "E";
-  if (deg >= 135 && deg < 225) return "S";
-  if (deg >= 225 && deg < 315) return "W";
-  return "N";
+  return { reply, severity };
 };

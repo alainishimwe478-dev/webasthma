@@ -1,9 +1,11 @@
-# GitHub Push Progress
+# Dynamic Prediction Updates - Progress Tracker
 
-## Plan Steps:
-- [x] 1. Stage all changes (git add .) - ✅ Completed (warnings are normal CRLF on Windows)
-- [ ] 2. Commit with message  
-- [ ] 3. Push to origin/main (git push origin main)
-- [ ] 4. Verify with git log and GitHub
+## Steps from Approved Plan:
 
-Current status: Staging done, proceeding to commit...
+- [ ] **Step 1**: Update `src/utils/aiPrediction.js` - Replace calculateRisk with simplified env-based scoring (AQI, humidity, temp, pm25, pollen).
+- [x] **Step 2**: Update `src/pages/PatientDashboard-old.jsx` 
+  - Replace static `recommendationItems = predictions.filter(...)` with dynamic env/risk logic.
+  - Fix broken JSX className: `text-slate Ascent` → `text-slate-500` and complete div.
+- [ ] **Step 3**: Test changes - Refresh dashboard, verify recommendations change with env data.
+
+**Next Action**: Complete Step 1 (aiPrediction.js update).

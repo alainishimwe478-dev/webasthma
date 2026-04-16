@@ -1,51 +1,15 @@
+// src/utils/rwandaEnvironment.js
+
+// Coordinates for major cities in Rwanda
+export const RWANDA_LOCATIONS = {
+  kigali: { lat: -1.949, lon: 30.0588 },
+  butare: { lat: -2.596, lon: 29.739 },
+  ruhengeri: { lat: -1.503, lon: 29.635 },
+  gisenyi: { lat: -1.703, lon: 29.258 },
+  cyangugu: { lat: -2.584, lon: 28.899 },
+};
+
 import { currentEnvKigali } from "./mockData";
-
-export const RWANDA_DEFAULT_LOCATION = {
-  label: "Huye, Rwanda",
-  district: "Huye",
-  lat: -2.5967,
-  lon: 29.7394,
-  accuweatherUrl:
-    "https://www.accuweather.com/en/rw/huye/1606706/hourly-weather-forecast/1606706",
-};
-
-const RWANDA_LOCATIONS = {
-  Kigali: {
-    label: "Kigali, Rwanda",
-    district: "Kigali",
-    lat: -1.9441,
-    lon: 30.0619,
-    accuweatherUrl:
-      "https://www.accuweather.com/en/rw/kigali/227440/hourly-weather-forecast/227440",
-  },
-  Rubavu: {
-    label: "Rubavu, Rwanda",
-    district: "Rubavu",
-    lat: -1.679,
-    lon: 29.258,
-    accuweatherUrl:
-      "https://www.accuweather.com/en/rw/rubavu/1606710/hourly-weather-forecast/1606710",
-  },
-  Huye: {
-    ...RWANDA_DEFAULT_LOCATION,
-  },
-  Muhanga: {
-    label: "Muhanga, Rwanda",
-    district: "Muhanga",
-    lat: -2.0845,
-    lon: 29.7566,
-    accuweatherUrl:
-      "https://www.accuweather.com/en/rw/muhanga/1606711/hourly-weather-forecast/1606711",
-  },
-  Musanze: {
-    label: "Musanze, Rwanda",
-    district: "Musanze",
-    lat: -1.4996,
-    lon: 29.6344,
-    accuweatherUrl:
-      "https://www.accuweather.com/en/rw/musanze/1606712/hourly-weather-forecast/1606712",
-  },
-};
 
 const asFiniteNumber = (value, fallback) => {
   const parsed = Number(value);
@@ -60,11 +24,6 @@ const toCompassDirection = (value) => {
   const degrees = Number(value);
   if (!Number.isFinite(degrees)) return "ESE";
   return windDirections[Math.round(degrees / 22.5) % 16];
-};
-
-export const getRwandaLocation = (user) => {
-  const locationKey = user?.district || user?.location || "Kigali";
-  return RWANDA_LOCATIONS[locationKey] || RWANDA_DEFAULT_LOCATION;
 };
 
 export const normalizeEnvironmentData = (data = {}) => {
@@ -108,9 +67,13 @@ export const normalizeEnvironmentData = (data = {}) => {
     windDirection,
     uvIndex,
     airQualityStatus,
-    location: data.location || currentEnvKigali.location || RWANDA_DEFAULT_LOCATION.label,
-    sourceLabel: data.sourceLabel || "AccuWeather reference",
-    sourceUrl: data.sourceUrl || RWANDA_DEFAULT_LOCATION.accuweatherUrl,
+    // NEW for forecast cards
+    afternoonTemp: Math.round(asFiniteNumber(data.afternoonTemp, currentEnvKigali.afternoonTemp || 25)),
+    afternoonDesc: data.afternoonDesc || currentEnvKigali.afternoonDesc || "Clear",
+    sunset: data.sunset || currentEnvKigali.sunset || Date.now() / 1000 + 7200, // 2hr future
+    location: data.location || currentEnvKigali.location || "Kigali, Rwanda",
+    sourceLabel: data.sourceLabel || "Local Data",
+    sourceUrl: data.sourceUrl || "https://www.accuweather.com",
     source: data.source || "fallback",
     lastUpdated: data.lastUpdated || currentEnvKigali.timestamp,
   };
@@ -184,3 +147,28 @@ export const getAqiStandard = (aqi) => {
     tone: "text-red-700 bg-red-100",
   };
 };
+
+export const getPollenStandard = (pollen) => {
+  if (pollen <= 30) {
+    return {
+      label: "Good",
+      tone: "text-emerald-700 bg-emerald-100",
+      message: "Low pollen levels, safe for outdoor activities.",
+    };
+  }
+
+  if (pollen <= 60) {
+    return {
+      label: "Caution",
+      tone: "text-amber-700 bg-amber-100",
+      message: "Moderate pollen, consider medication before outdoors.",
+    };
+  }
+
+  return {
+    label: "Poor",
+    tone: "text-red-700 bg-red-100",
+    message: "High pollen may trigger symptoms, stay indoors.",
+  };
+};
+
