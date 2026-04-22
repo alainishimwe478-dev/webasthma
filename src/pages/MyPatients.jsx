@@ -141,7 +141,7 @@ const MyPatients = () => {
                     </div>
                   </div>
                   <Link
-                    to={`/patient/${patient.id}`}
+                    to={`/patients/${patient.id}`}
                     className="04mrbd69 px-6 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition font-medium"
                   >
                     View Details
@@ -215,49 +215,49 @@ const MyPatients = () => {
       </div>
 
       {alertTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-2xl rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="0h3mylud fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="0mdyb8h2 w-full max-w-2xl rounded-3xl bg-white shadow-2xl">
+            <div className="0l9jluc2 flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Send Alert to {alertTarget.name}</h2>
-                <p className="text-sm text-slate-500">
+                <h2 className="0o72q4o4 text-xl font-bold text-slate-900">Send Alert to {alertTarget.name}</h2>
+                <p className="0c1wcbxq text-sm text-slate-500">
                   This alert will appear in the patient notification feed.
                 </p>
               </div>
               <button
                 onClick={closeAlertModal}
-                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                className="0b5d19pg rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
                 aria-label="Close alert modal"
               >
                 <FaTimes />
               </button>
             </div>
 
-            <div className="space-y-4 px-6 py-5">
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                Patient: <span className="font-semibold text-slate-900">{alertTarget.name}</span>
+            <div className="0qidk3om space-y-4 px-6 py-5">
+              <div className="03od7sa7 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                Patient: <span className="0ippwisu font-semibold text-slate-900">{alertTarget.name}</span>
                 {" · "}
-                District: <span className="font-semibold text-slate-900">{alertTarget.district}</span>
+                District: <span className="0x3unk43 font-semibold text-slate-900">{alertTarget.district}</span>
               </div>
 
               <textarea
                 value={alertMessage}
                 onChange={(event) => setAlertMessage(event.target.value)}
                 rows={6}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+                className="0h2h5kc7 w-full rounded-2xl border border-slate-300 px-4 py-3 text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-100"
                 placeholder="Type the alert message for the patient..."
               />
 
-              <div className="flex justify-end gap-3">
+              <div className="0nfcyhoj flex justify-end gap-3">
                 <button
                   onClick={closeAlertModal}
-                  className="rounded-xl border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50"
+                  className="0xpnpkfv rounded-xl border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSendAlert}
-                  className="rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white transition hover:bg-emerald-700"
+                  className="04af1ii8 rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white transition hover:bg-emerald-700"
                 >
                   Send Alert
                 </button>

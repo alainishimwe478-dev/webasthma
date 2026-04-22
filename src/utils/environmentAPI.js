@@ -1,7 +1,6 @@
 import { RWANDA_LOCATIONS, normalizeEnvironmentData } from './rwandaEnvironment.js';
 import { currentEnvKigali } from './mockData.js';
 import { calculateRisk } from './aiPrediction.js';
-
 // Mock AQI data for Rwanda (existing)
 const MOCK_AQI = {
   kigali: 75,
@@ -193,7 +192,7 @@ export const fetchFullForecast = async (lat, lon) => {
   }
   try {
     // OWM One Call API 3.0 for hourly forecast & daily sunset
-    const url = `https://api.openweathermap.org/data/3.0/onecall?lat=\${lat}&lon=\${lon}&exclude=minutely,alerts&appid=\${OWM_API_KEY}&units=metric`;
+    const url = `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&exclude=minutely,alerts&appid=${OWM_API_KEY}&units=metric`;
     const resp = await fetch(url);
     const data = await resp.json();
 
@@ -225,7 +224,7 @@ export const fetchLiveEnvData = async (lat, lon, label) => {
   try {
     // Current + forecast
     const [currentResp, forecast] = await Promise.all([
-      fetch(`https://api.openweathermap.org/data/2.5/weather?lat=\${lat}&lon=\${lon}&units=metric&appid=\${OWM_API_KEY}`),
+      fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${OWM_API_KEY}`),
       fetchFullForecast(lat, lon)
     ]);
     const currentData = await currentResp.json();
@@ -249,24 +248,41 @@ export const getRwandaFallback = () => currentEnvKigali;
 
 export const WEATHER_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
-// Existing chatbot stub
+// Enhanced chatbot with more asthma sickness/symptom responses
 export const fetchChatbotResponse = async (question, environment, user) => {
   const lowerQ = question.toLowerCase();
-  let reply = "Thanks for sharing. Monitor your symptoms and use your inhaler if needed.";
+  let reply = `Thanks for sharing, ${user.name || 'friend'}. Monitor your symptoms and use your inhaler if needed. Current env: AQI ${environment.aqi}, humidity ${environment.humidity}%.`;
   let severity = 'normal';
 
-  if (lowerQ.includes('wheezing') || lowerQ.includes('shortness')) {
-    reply = "That sounds concerning. Use your rescue inhaler now and contact your doctor if it persists >15 min.";
+  if (lowerQ.includes('wheezing') || lowerQ.includes('wheeze')) {
+    reply = "Wheezing is a key asthma symptom. Use your rescue inhaler immediately (1-2 puffs). Stay calm, sit upright. If no improvement in 15 min or worsening, seek emergency care.";
+    severity = 'high';
+  } else if (lowerQ.includes('shortness') || lowerQ.includes('breathless')) {
+    reply = "Shortness of breath is serious. Take slow breaths, use rescue inhaler now. Check peak flow if possible. Contact doctor if persists.";
     severity = 'high';
   } else if (lowerQ.includes('chest') || lowerQ.includes('tight')) {
-    reply = "Chest tightness can be serious. Sit upright, try pursed lip breathing, and use inhaler PRN.";
+    reply = "Chest tightness – try pursed lip breathing: inhale nose 2s, exhale mouth 4s. Use controller/rescue inhaler. Rest and monitor.";
+    severity = 'medium';
+  } else if (lowerQ.includes('cough') || lowerQ.includes('persistent cough')) {
+    reply = "Cough can indicate airway inflammation. Nighttime cough? Use controller med. Hydrate, avoid triggers. Track frequency.";
+    severity = 'medium';
+  } else if (lowerQ.includes('peak flow') || lowerQ.includes('low peakflow')) {
+    reply = "Low peak flow (<80% personal best) means airway restriction. Use bronchodilator, recheck in 15 min. Log readings for doctor.";
+    severity = 'high';
+  } else if (lowerQ.includes('tired') || lowerQ.includes('fatigue') || lowerQ.includes('weak')) {
+    reply = "Fatigue with breathing issues may signal poor control. Check O2 if available, rest, hydrate. Update your asthma action plan.";
     severity = 'medium';
   } else if (lowerQ.includes('aqi') || lowerQ.includes('air')) {
     const std = environment.aqi <= 50 ? 'Good' : environment.aqi <= 100 ? 'Moderate' : 'Poor';
-    reply = `Current AQI is ${environment.aqi} (${std}). ${environment.aqi > 100 ? 'Stay indoors.' : 'Good conditions.'}`;
+    reply = `AQI ${environment.aqi} (${std}). ${environment.aqi > 100 ? 'Limit outdoor activity, use mask if out.' : 'Safe but monitor.'}`;
+    severity = environment.aqi > 100 ? 'medium' : 'normal';
   } else if (lowerQ.includes('humidity') || lowerQ.includes('weather')) {
-    const std = environment.humidity <= 60 ? 'Good' : 'Caution';
-    reply = `Humidity ${environment.humidity}% (${std}). ${environment.humidity > 70 ? 'Use dehumidifier.' : 'OK'}`;
+    const std = environment.humidity <= 60 ? 'Good' : 'High';
+    reply = `Humidity ${environment.humidity}% (${std}). High humidity worsens symptoms – use dehumidifier, avoid damp areas.`;
+    severity = environment.humidity > 70 ? 'medium' : 'normal';
+  } else if (lowerQ.includes('attack') || lowerQ.includes('severe')) {
+    reply = "Asthma attack signs: Use rescue inhaler STAT, stay calm. No improvement? Call emergency services NOW.";
+    severity = 'high';
   }
 
   return { reply, severity };

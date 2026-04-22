@@ -1,4 +1,4 @@
-import { districtRisk, districtAlerts, currentEnvKigali, users, healthLogs } from './mockData';
+import { districtRisk, districtAlerts, currentEnvKigali, users, healthLogs } from './mockData.js';
 
 export const calculateRisk = (userId, env) => {
   let score = 0;
@@ -59,3 +59,55 @@ export const predictRisk = async (symptoms, location) => {
     recommendations: [risk.recommendationText]
   };
 };
+
+// NEW: Generate recommendations array for RecommendationFeed
+export const generateRecommendations = (risk, env) => {
+  const recs = [];
+
+  // Base on risk level
+  if (risk.riskLevel === 'High') {
+    recs.push({
+      recommendationText: '🚨 High risk today. Stay indoors, use preventive inhaler, avoid triggers.',
+      riskLevel: 'High',
+      triggeringFactors: ['Poor air quality', 'Extreme weather']
+    });
+  } else if (risk.riskLevel === 'Medium') {
+    recs.push({
+      recommendationText: '⚠️ Medium risk. Limit outdoor activities, monitor symptoms closely.',
+      riskLevel: 'Medium',
+      triggeringFactors: ['Moderate pollution']
+    });
+  } else {
+    recs.push({
+      recommendationText: '✅ Low risk. Good conditions, but continue your regular management plan.',
+      riskLevel: 'Low',
+      triggeringFactors: []
+    });
+  }
+
+  // Env-specific
+  if (env.aqi > 100) {
+    recs.push({
+      recommendationText: 'Air quality poor (AQI ' + env.aqi + '). Wear mask if outside, keep windows closed.',
+      riskLevel: 'Medium',
+      triggeringFactors: ['High PM2.5']
+    });
+  }
+  if (env.humidity > 70) {
+    recs.push({
+      recommendationText: 'High humidity (' + env.humidity + '%). Use dehumidifier, avoid damp areas.',
+      riskLevel: 'Medium',
+      triggeringFactors: ['Mold risk']
+    });
+  }
+  if (env.temperature < 18 || env.temperature > 30) {
+    recs.push({
+      recommendationText: 'Extreme temp (' + env.temperature + '°C). Dress appropriately, stay hydrated.',
+      riskLevel: 'Medium',
+      triggeringFactors: ['Cold/dry air']
+    });
+  }
+
+  return recs.slice(0, 4); // Limit to 4
+};
+

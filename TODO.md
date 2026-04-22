@@ -1,11 +1,11 @@
-# Dynamic Prediction Updates - Progress Tracker
+# Fix PatientDashboard.jsx Syntax Error - Progress Tracker
 
-## Steps from Approved Plan:
+## Plan Steps:
+- [x] 1. Create this TODO.md with detailed steps ✅
+- [x] 2. Edit src/pages/PatientDashboard.jsx to fix JSX grid structure: Make 2-column grid (Risk left, Env+Recs right), move High Risk table to full-width section below ✅
+- [x] 3. Verify file syntax and save ✅
+- [ ] 4. Test Vite dev server reloads without error
+- [ ] 5. Confirm task complete and cleanup TODO.md
 
-- [ ] **Step 1**: Update `src/utils/aiPrediction.js` - Replace calculateRisk with simplified env-based scoring (AQI, humidity, temp, pm25, pollen).
-- [x] **Step 2**: Update `src/pages/PatientDashboard-old.jsx` 
-  - Replace static `recommendationItems = predictions.filter(...)` with dynamic env/risk logic.
-  - Fix broken JSX className: `text-slate Ascent` → `text-slate-500` and complete div.
-- [ ] **Step 3**: Test changes - Refresh dashboard, verify recommendations change with env data.
+**Current Status:** Ready for edit. After each step, update this file.
 
-**Next Action**: Complete Step 1 (aiPrediction.js update).

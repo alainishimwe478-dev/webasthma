@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { Server } from "socket.io";
 import { createReadStream, existsSync } from "node:fs";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -150,7 +151,7 @@ await loadLocalEnv();
 
 const handleChat = createChatHandler(process.env);
 
-const server = createServer(async (req, res) => {
+const httpServer = createServer(async (req, res) => {
   const pathname = new URL(req.url || "/", "http://localhost").pathname;
 
   if (await handleChat(req, res)) {
@@ -185,6 +186,28 @@ const server = createServer(async (req, res) => {
     sendText(res, 500, "Could not serve the application.");
   }
 });
+
+const io = new Server(httpServer, {
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST"]
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  socket.on('message', (message) => {
+    console.log('Message from', message.sender, ':', message.text);
+    socket.broadcast.emit('message', message); // Broadcast to all others
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
+const server = httpServer;
 
 const port = Number.parseInt(process.env.PORT || "4173", 10);
 

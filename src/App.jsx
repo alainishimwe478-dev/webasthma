@@ -5,35 +5,38 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
-import MyPatients from "./pages/MyPatients";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
-import EducationalHub from "./pages/EducationalHub";
-import PatientLayout from "@/layouts/PatientLayout";
-import PatientDashboard from "./pages/PatientDashboard";
+import PatientsPage from "./pages/PatientsPage";
 import PatientDetails from "./pages/PatientDetails";
-import Alerts from "./pages/Patient/Alerts";
-import Environment from "./pages/Patient/Environment";
-import Profile from "./pages/Patient/Profile";
-import AIRisk from "./pages/Patient/AIRisk";
-import LogSymptoms from "./pages/Patient/LogSymptoms";
-import RecentActivity from "./pages/Patient/RecentActivity";
-import Hospitals from "./pages/Patient/Hospitals";
+import AddPatientForm from "./pages/AddPatientForm";
+import EducationalHub from "./pages/EducationalHub";
 import SystemAnalytics from "./pages/SystemAnalytics";
 import ManageUsers from "./pages/ManageUsers";
 import AdminEnvironment from "./pages/Environment";
-import Settings from "./pages/Settings";
 import ContentManagement from "./pages/ContentManagement";
+import Settings from "./pages/Settings";
+import PatientLayout from "./layouts/PatientLayout";
+import PatientDashboard from "./pages/PatientDashboard";
+import AIRisk from "./pages/Patient/AIRisk";
+import Alerts from "./pages/Patient/Alerts";
+import LogSymptoms from "./pages/Patient/LogSymptoms";
+import RecentActivity from "./pages/Patient/RecentActivity";
+import Hospitals from "./pages/Patient/Hospitals";
+import Environment from "./pages/Patient/Environment";
+import Profile from "./pages/Patient/Profile";
+import PatientInbox from "./pages/PatientInbox";
+import ConsultationPage from "./pages/ConsultationPage";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return <div className="0fhehhbl p-8 text-center">Loading...</div>;
+    return <div className="02crb2ez p-8 text-center">Loading...</div>;
   }
 
   if (!isAuthenticated) {
@@ -67,7 +70,7 @@ const AppRoutes = () => {
         path="/patients"
         element={
           <ProtectedRoute>
-            <MyPatients />
+            <PatientsPage />
           </ProtectedRoute>
         }
       />
@@ -80,20 +83,28 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/doctor/patients"
+        element={
+          <ProtectedRoute>
+            <PatientsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/doctor/patients/add"
+        element={
+          <ProtectedRoute>
+            <AddPatientForm />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/system-analytics"
         element={
           <ProtectedRoute>
             <SystemAnalytics />
           </ProtectedRoute>
         }
-      />
-      <Route
-        path="/symptoms"
-        element={<Navigate to="/patient/log-symptoms" replace />}
-      />
-      <Route
-        path="/alerts"
-        element={<Navigate to="/patient/alerts" replace />}
       />
       <Route
         path="/users"
@@ -128,22 +139,6 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/environment/:userId?"
-        element={
-          <ProtectedRoute>
-            <Environment />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/symptoms/:userId?"
-        element={
-          <ProtectedRoute>
-            <LogSymptoms />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/patient"
         element={
           <ProtectedRoute>
@@ -160,10 +155,19 @@ const AppRoutes = () => {
         <Route path="hospitals" element={<Hospitals />} />
         <Route path="environment" element={<Environment />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="inbox" element={<PatientInbox />} />
       </Route>
+      <Route
+        path="/consultation/:consultationId"
+        element={
+          <ProtectedRoute>
+            <ConsultationPage />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
-}
+};
 
 function App() {
   return (

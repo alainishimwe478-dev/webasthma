@@ -14,11 +14,11 @@ const MOCK_AQI = {
 
 // NEW: Mock full env data for weather fallback (task)
 const MOCK_ENV = {
-  kigali: { aqi: 75, temp: 22, humidity: 55 },
-  butare: { aqi: 60, temp: 23, humidity: 60 },
-  ruhengeri: { aqi: 50, temp: 20, humidity: 50 },
-  gisenyi: { aqi: 55, temp: 21, humidity: 65 },
-  cyangugu: { aqi: 65, temp: 24, humidity: 70 },
+  kigali: { aqi: 75, temp: 22, humidity: 55, pollen: 45 },
+  butare: { aqi: 60, temp: 23, humidity: 60, pollen: 30 },
+  ruhengeri: { aqi: 50, temp: 20, humidity: 50, pollen: 60 },
+  gisenyi: { aqi: 55, temp: 21, humidity: 65, pollen: 25 },
+  cyangugu: { aqi: 65, temp: 24, humidity: 70, pollen: 35 },
 };
 
 // Existing
@@ -132,6 +132,9 @@ export const fetchAllEnvironments = async () => {
   }
   return envData;
 };
+
+// NEW: Default current (Kigali) for dashboard
+export const fetchCurrentEnvironment = async () => fetchEnvironment('kigali');
 
 // Existing BACKWARD COMPATIBILITY
 export const fetchDashboardData = async (locationLabel = 'kigali', userId) => {

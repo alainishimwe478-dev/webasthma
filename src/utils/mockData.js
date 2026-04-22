@@ -11,7 +11,13 @@ const defaultUsers = [
     password: 'doctor123',
     role: 'doctor',
     district: 'Kigali',
-    assignedPatients: [3,4,5]
+    assignedPatients: [3,4,5],
+    credentials: {
+      qualifications: 'MD, Pulmonology Specialist',
+      license: 'RWA-MD-2023-001',
+      experience: '15 years',
+      certifications: ['Board Certified Pulmonologist', 'Asthma Specialist']
+    }
   },
   {
     id: 2,
@@ -54,7 +60,10 @@ const defaultUsers = [
       { name: 'Budesonide/Formoterol', dosage: '1 puff BID', frequency: 'daily' },
       { name: 'Montelukast', dosage: '10mg nightly', frequency: 'daily' }
     ],
-    assignedDoctorId: 1
+    assignedDoctorId: 1,
+    previousHospitalizations: `2024-01 - Asthma attack - 3 days - Recovered with oxygen therapy
+2023-08 - Pneumonia - 5 days - Recovered with antibiotics
+2022-12 - Hypertensive crisis - 2 days - Stabilized with medication`
   },
   // Patient 3: pet dander trigger
   {
@@ -71,7 +80,8 @@ const defaultUsers = [
     medicationRegimen: [
       { name: 'Cetirizine', dosage: '10mg daily', frequency: 'daily' }
     ],
-    assignedDoctorId: 1
+    assignedDoctorId: 1,
+    previousHospitalizations: `2024-02 - Severe allergic reaction - 1 day - Discharged with antihistamines`
   },
 ];
 
@@ -429,3 +439,39 @@ export const markNotificationRead = (id) => {
   if (notification) notification.read = true;
   dispatchNotificationUpdate();
 };
+
+export let messages = [
+  {
+    id: 'msg1',
+    senderId: 'doctor1',
+    receiverId: '3', // Marie Uwase (patient)
+    content: 'Your recent test results look good. Continue with your current medication.',
+    timestamp: new Date().toISOString(),
+    read: false,
+    type: 'text',
+    subject: 'Test Results Update',
+    doctorName: 'Dr. Sarah Johnson',
+  },
+  {
+    id: 'msg2',
+    senderId: 'doctor1',
+    receiverId: '3',
+    content: '💊 New prescription: Albuterol inhaler - 2 puffs every 4-6 hours as needed',
+    timestamp: new Date(Date.now() - 86400000).toISOString(),
+    read: true,
+    type: 'prescription',
+    subject: 'New Prescription',
+    doctorName: 'Dr. Sarah Johnson',
+  },
+  {
+    id: 'msg3',
+    senderId: 'doctor1',
+    receiverId: '4', // Jean Bizimana (patient)
+    content: 'Please monitor your symptoms closely. Call if you experience increased wheezing.',
+    timestamp: new Date(Date.now() - 172800000).toISOString(),
+    read: false,
+    type: 'text',
+    subject: 'Symptom Monitoring',
+    doctorName: 'Dr. Sarah Johnson',
+  },
+];
